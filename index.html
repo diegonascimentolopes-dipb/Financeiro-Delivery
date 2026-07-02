@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestão Delivery Pro - V6.1 Final Auth</title>
+    <title>Gestão Delivery Pro - V6.3 Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
@@ -29,6 +29,10 @@
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Modais */
+        .modal-overlay { display: none; }
+        .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
 
         /* REGRAS DE AUTENTICAÇÃO E PERMISSÕES */
         body.role-operador .admin-only { display: none !important; }
@@ -49,6 +53,72 @@
 </head>
 <body class="pb-12">
 
+    <!-- Modal Receber Previsão iFood -->
+    <div id="modal-receber-previsao" class="modal-overlay fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div class="p-4 bg-amber-50 border-b border-amber-200">
+                <h3 class="font-bold text-amber-800">Confirmar Recebimento (Repasse)</h3>
+            </div>
+            <div class="p-5 space-y-4">
+                <input type="hidden" id="modal-prev-id">
+                <p class="text-sm text-slate-600">O valor será retirado de "Pendente iFood" e adicionado à conta destino escolhida abaixo.</p>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Valor do Repasse (R$)</label>
+                    <input type="number" id="modal-prev-valor" class="w-full border border-slate-300 rounded px-3 py-2 outline-none font-bold text-slate-800" step="0.01">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Data de Recebimento</label>
+                    <input type="date" id="modal-prev-data" class="w-full border border-slate-300 rounded px-3 py-2 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Entrou em qual conta?</label>
+                    <select id="modal-prev-conta" class="w-full border border-slate-300 rounded px-3 py-2 outline-none dynamic-contas"></select>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button onclick="confirmarRecebimentoPrevisao()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded transition">Confirmar Entrada</button>
+                    <button onclick="fecharModal('modal-receber-previsao')" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2.5 rounded transition">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Lançar Mês Histórico -->
+    <div id="modal-historico-mes" class="modal-overlay fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div class="p-4 bg-slate-800 border-b border-slate-900 flex justify-between items-center">
+                <h3 class="font-bold text-white">Adicionar Histórico Consolidado (Mês Antigo)</h3>
+                <button onclick="fecharModal('modal-historico-mes')" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <form id="form-historico-mes" class="p-5 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-bold mb-1">Mês de Referência</label><input type="month" id="hist-mes" class="w-full border rounded px-3 py-2" required></div>
+                    <div><label class="block text-xs font-bold mb-1">Qtd. Pedidos (Mês)</label><input type="number" id="hist-pedidos" class="w-full border rounded px-3 py-2" required></div>
+                </div>
+                <div class="p-3 bg-blue-50 border border-blue-200 rounded">
+                    <h4 class="font-bold text-sm text-blue-800 mb-2">Total de Entradas / Vendas</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div><label class="block text-xs mb-1">Venda Bruta (R$)</label><input type="number" id="hist-venda-bruta" class="w-full border rounded px-3 py-2" step="0.01" required></div>
+                        <div><label class="block text-xs mb-1">Taxas iFood (R$)</label><input type="number" id="hist-taxa-ifood" class="w-full border rounded px-3 py-2" step="0.01" required></div>
+                        <div><label class="block text-xs mb-1">Taxas Cartão (R$)</label><input type="number" id="hist-taxa-cartao" class="w-full border rounded px-3 py-2" step="0.01" required></div>
+                    </div>
+                </div>
+                <div class="p-3 bg-rose-50 border border-rose-200 rounded">
+                    <h4 class="font-bold text-sm text-rose-800 mb-2">Saídas / Despesas Totais</h4>
+                    <div><label class="block text-xs mb-1">Valor Total Saídas (R$)</label><input type="number" id="hist-saidas" class="w-full border rounded px-3 py-2" step="0.01" required></div>
+                </div>
+                <div class="p-3 bg-slate-100 border border-slate-200 rounded">
+                    <h4 class="font-bold text-sm text-slate-800 mb-2">Saldos Finais no Último Dia do Mês</h4>
+                    <p class="text-[10px] text-slate-500 mb-2">Isso ajuda a compor o patrimônio na virada de mês.</p>
+                    <div id="container-hist-saldos" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <!-- Campos de saldo renderizados dinamicamente -->
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded mt-4 shadow">Salvar Mês Histórico</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Login e Loader originais -->
     <div id="login-overlay" class="fixed inset-0 bg-slate-900 z-[100] flex flex-col items-center justify-center text-white hidden">
         <div class="bg-white text-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-sm mx-4">
             <div class="text-center mb-6">
@@ -59,14 +129,8 @@
                 <p class="text-xs text-slate-500 mt-1">Acesso Restrito</p>
             </div>
             <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Usuário</label>
-                    <input type="text" id="login-user" class="w-full border border-slate-300 rounded-md px-3 py-2 outline-none focus:border-blue-500" placeholder="admin ou operador" onkeypress="if(event.key === 'Enter') document.getElementById('login-pass').focus()">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Senha</label>
-                    <input type="password" id="login-pass" class="w-full border border-slate-300 rounded-md px-3 py-2 outline-none focus:border-blue-500" placeholder="••••" onkeypress="if(event.key === 'Enter') fazerLogin()">
-                </div>
+                <div><label class="block text-sm font-medium mb-1">Usuário</label><input type="text" id="login-user" class="w-full border border-slate-300 rounded-md px-3 py-2 outline-none focus:border-blue-500" placeholder="admin ou operador" onkeypress="if(event.key === 'Enter') document.getElementById('login-pass').focus()"></div>
+                <div><label class="block text-sm font-medium mb-1">Senha</label><input type="password" id="login-pass" class="w-full border border-slate-300 rounded-md px-3 py-2 outline-none focus:border-blue-500" placeholder="••••" onkeypress="if(event.key === 'Enter') fazerLogin()"></div>
                 <button onclick="fazerLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-md transition shadow-md mt-2">Entrar no Sistema</button>
                 <p id="login-err" class="text-rose-500 text-sm mt-2 hidden text-center font-medium bg-rose-50 p-2 rounded">Credenciais inválidas!</p>
             </div>
@@ -85,137 +149,134 @@
                 <div class="flex-shrink-0 flex items-center gap-3">
                     <span class="font-bold text-xl text-slate-800 tracking-tight">Delivery PRO</span>
                     <div class="flex items-center gap-1">
-                        <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded uppercase tracking-wide">V6.1 Auth</span>
+                        <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded uppercase tracking-wide">V6.3 Import</span>
                         <button onclick="sair()" class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded hover:bg-rose-100 hover:text-rose-700 transition font-bold border border-slate-200">SAIR</button>
                     </div>
                 </div>
                 <nav class="hidden lg:flex space-x-1 overflow-x-auto no-scrollbar">
                     <button class="nav-btn text-blue-600 border-blue-600 border-b-2 px-3 py-4 text-sm font-medium transition-colors whitespace-nowrap" data-target="dashboard">Dashboard</button>
                     <button class="nav-btn text-slate-500 hover:text-blue-600 border-transparent border-b-2 px-3 py-4 text-sm font-medium transition-colors whitespace-nowrap" data-target="lancamentos">Movimentações</button>
-                    <button class="nav-btn text-slate-500 hover:text-blue-600 border-transparent border-b-2 px-3 py-4 text-sm font-medium transition-colors whitespace-nowrap relative" data-target="contas_pagar">
-                        A Pagar <span id="badge-atrasadas" class="hidden absolute top-2 right-0 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">!</span>
-                    </button>
+                    <button class="nav-btn text-slate-500 hover:text-blue-600 border-transparent border-b-2 px-3 py-4 text-sm font-medium transition-colors whitespace-nowrap relative" data-target="contas_pagar">A Pagar <span id="badge-atrasadas" class="hidden absolute top-2 right-0 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">!</span></button>
                     <button class="nav-btn text-slate-500 hover:text-blue-600 border-transparent border-b-2 px-3 py-4 text-sm font-medium transition-colors whitespace-nowrap" data-target="fechamento">Conciliação</button>
-                    <button class="nav-btn text-slate-500 hover:text-blue-600 border-transparent border-b-2 px-3 py-4 text-sm font-medium transition-colors whitespace-nowrap" data-target="relatorios">Relatórios</button>
+                    <button class="nav-btn text-slate-500 hover:text-blue-600 border-transparent border-b-2 px-3 py-4 text-sm font-medium transition-colors whitespace-nowrap" data-target="relatorios">DRE/Resultados</button>
                     <button class="nav-btn text-slate-500 hover:text-blue-600 border-transparent border-b-2 px-3 py-4 text-sm font-medium transition-colors whitespace-nowrap" data-target="socios">Sócios</button>
-                    <button class="nav-btn text-slate-500 hover:text-blue-600 border-transparent border-b-2 px-3 py-4 text-sm font-medium transition-colors whitespace-nowrap admin-only" data-target="sistema">Dados da Nuvem</button>
+                    <button class="nav-btn text-slate-500 hover:text-blue-600 border-transparent border-b-2 px-3 py-4 text-sm font-medium transition-colors whitespace-nowrap admin-only" data-target="sistema">Ajustes Nuvem</button>
                 </nav>
             </div>
+            <!-- Mobile nav -->
             <div class="flex lg:hidden overflow-x-auto space-x-4 pb-3 nav-mobile no-scrollbar mt-2 border-t border-slate-100 pt-2">
-                <button class="nav-btn text-blue-600 text-sm font-medium whitespace-nowrap border-b-2 border-blue-600 pb-1" data-target="dashboard">Visão Geral</button>
-                <button class="nav-btn text-slate-500 text-sm font-medium whitespace-nowrap border-b-2 border-transparent pb-1" data-target="lancamentos">Caixa</button>
+                <button class="nav-btn text-blue-600 text-sm font-medium whitespace-nowrap border-b-2 border-blue-600 pb-1" data-target="dashboard">Geral</button>
+                <button class="nav-btn text-slate-500 text-sm font-medium whitespace-nowrap border-b-2 border-transparent pb-1" data-target="lancamentos">Lançamentos</button>
                 <button class="nav-btn text-slate-500 text-sm font-medium whitespace-nowrap border-b-2 border-transparent pb-1" data-target="contas_pagar">A Pagar</button>
-                <button class="nav-btn text-slate-500 text-sm font-medium whitespace-nowrap border-b-2 border-transparent pb-1" data-target="fechamento">Conciliação</button>
+                <button class="nav-btn text-slate-500 text-sm font-medium whitespace-nowrap border-b-2 border-transparent pb-1" data-target="fechamento">Caixa</button>
                 <button class="nav-btn text-slate-500 text-sm font-medium whitespace-nowrap border-b-2 border-transparent pb-1" data-target="relatorios">DRE</button>
                 <button class="nav-btn text-slate-500 text-sm font-medium whitespace-nowrap border-b-2 border-transparent pb-1" data-target="socios">Sócios</button>
-                <button class="nav-btn text-slate-500 text-sm font-medium whitespace-nowrap border-b-2 border-transparent pb-1 admin-only" data-target="sistema">Nuvem</button>
+                <button class="nav-btn text-slate-500 text-sm font-medium whitespace-nowrap border-b-2 border-transparent pb-1 admin-only" data-target="sistema">Config</button>
             </div>
         </div>
     </header>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
 
+        <!-- DASHBOARD -->
         <div id="dashboard" class="tab-content active">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h2 class="text-xl font-bold text-slate-800">Painel Financeiro Consolidado</h2>
-                <div class="flex items-center gap-3">
+                <h2 class="text-xl font-bold text-slate-800">Painel Financeiro</h2>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button onclick="abrirModal('modal-historico-mes')" class="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-md border border-indigo-200 hover:bg-indigo-100 font-bold admin-only">+ Add Mês Passado</button>
                     <div class="bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2">
                         <label class="text-xs font-medium text-slate-500">Mês Visão:</label>
                         <input type="month" id="dash-filtro-mes" class="text-sm font-bold text-slate-800 border-none outline-none bg-transparent" onchange="atualizarTelas()">
                     </div>
-                    <button onclick="window.print()" class="print-btn text-sm bg-slate-800 text-white px-3 py-1.5 rounded-md hover:bg-slate-700 transition flex items-center gap-2 shadow-sm">
-                        🖨️ Imprimir
-                    </button>
+                    <button onclick="window.print()" class="print-btn text-sm bg-slate-800 text-white px-3 py-1.5 rounded-md hover:bg-slate-700 transition flex items-center shadow-sm">🖨️ Imprimir</button>
                 </div>
             </div>
 
-            <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Saldos Disponíveis Hoje (Global)</h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 border-t-4 border-t-slate-600">
-                    <p class="text-[10px] font-semibold text-slate-500 uppercase mb-1">Caixa Físico</p>
-                    <p class="text-2xl font-bold text-slate-800" id="dash-conta-caixa">R$ 0,00</p>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 border-t-4 border-t-emerald-500">
-                    <p class="text-[10px] font-semibold text-slate-500 uppercase mb-1">Conta Stone</p>
-                    <p class="text-2xl font-bold text-emerald-600" id="dash-conta-stone">R$ 0,00</p>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 border-t-4 border-t-blue-500">
-                    <p class="text-[10px] font-semibold text-slate-500 uppercase mb-1">Baú Ton</p>
-                    <p class="text-2xl font-bold text-blue-600" id="dash-conta-bau">R$ 0,00</p>
-                </div>
-                <div class="bg-slate-800 rounded-xl shadow-sm p-4 text-white">
-                    <p class="text-[10px] font-semibold text-slate-300 uppercase mb-1">Saldo Total Disponível</p>
-                    <p class="text-2xl font-bold" id="dash-conta-total">R$ 0,00</p>
-                </div>
-            </div>
+            <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Saldos Disponíveis Hoje</h3>
+            <!-- Renderizado dinamicamente via JS -->
+            <div id="dash-saldos-container" class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"></div>
 
-            <div class="bg-amber-50 rounded-xl shadow-sm border border-amber-200 p-4 mb-8 flex justify-between items-center relative overflow-hidden">
+            <div class="bg-amber-50 rounded-xl shadow-sm border border-amber-200 p-4 mb-8 flex flex-col md:flex-row justify-between md:items-center gap-4 relative overflow-hidden">
                 <div class="relative z-10">
                     <p class="text-[10px] font-bold text-amber-700 uppercase mb-1">Pendente iFood (A Receber)</p>
                     <p class="text-2xl font-bold text-amber-600" id="dash-conta-ifood">R$ 0,00</p>
                 </div>
-                <div class="text-right max-h-16 overflow-y-auto pr-2" id="dash-previsoes-ifood"></div>
+                <div class="w-full md:w-2/3 max-h-32 overflow-y-auto pr-2 bg-white/50 rounded p-2" id="dash-previsoes-ifood"></div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-2">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Perfomance Principal -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-3">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-base font-semibold text-slate-800" id="titulo-performance">Performance Operacional (Mês)</h3>
+                        <h3 class="text-base font-semibold text-slate-800">Resultados do Mês</h3>
                         <div class="flex items-center gap-2">
-                            <label class="text-[10px] font-medium text-slate-500 uppercase">Meta R$:</label>
-                            <input type="number" id="input-meta" class="w-20 text-sm border-b border-slate-300 px-1 py-0.5 outline-none font-bold text-slate-800 text-right admin-disabled" placeholder="15000" onchange="salvarMeta()">
+                            <label class="text-[10px] font-medium text-slate-500 uppercase">Meta Vendas R$:</label>
+                            <input type="number" id="input-meta" class="w-20 text-sm border-b border-slate-300 px-1 py-0.5 outline-none font-bold text-slate-800 text-right admin-disabled" onchange="salvarMeta()">
                         </div>
                     </div>
                     
-                    <div class="mb-5">
+                    <div class="mb-6">
                         <div class="flex justify-between text-sm mb-1">
-                            <span class="text-slate-500">Faturamento Bruto</span>
+                            <span class="text-slate-500 font-medium">Faturamento Bruto</span>
                             <span class="font-bold text-slate-800" id="dash-progresso-txt">0%</span>
                         </div>
-                        <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                            <div class="bg-blue-500 h-2.5 rounded-full" id="dash-progresso-barra" style="width: 0%"></div>
+                        <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                            <div class="bg-blue-500 h-3 rounded-full transition-all" id="dash-progresso-barra" style="width: 0%"></div>
                         </div>
-                        <p class="text-[11px] text-slate-400 mt-1 text-right"><strong id="dash-faturado-mes" class="text-slate-600">R$ 0,00</strong> de <span id="dash-meta-mes">R$ 0,00</span></p>
+                        <p class="text-xs text-slate-500 mt-1 text-right">Atingido: <strong id="dash-faturado-mes" class="text-slate-700">R$ 0,00</strong> / Meta: <span id="dash-meta-mes">R$ 0,00</span></p>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-4 pt-4 border-t border-slate-100">
-                        <div>
-                            <p class="text-[10px] text-slate-500 uppercase mb-1">Lucro Operacional</p>
-                            <p class="text-lg font-bold text-emerald-600" id="dash-lucro-mes">R$ 0,00</p>
-                            <p class="text-[9px] text-slate-400 mt-0.5">Vendas Brutas - Saídas</p>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-slate-100">
+                        <div class="col-span-2 md:col-span-1 bg-emerald-50 p-2 rounded">
+                            <p class="text-[10px] text-emerald-700 font-bold uppercase mb-1">Lucro Real (Caixa)</p>
+                            <p class="text-lg font-bold text-emerald-600" id="dash-lucro-real">R$ 0,00</p>
+                            <p class="text-[9px] text-slate-500">Entradas - Saídas reais</p>
                         </div>
-                        <div>
-                            <p class="text-[10px] text-slate-500 uppercase mb-1">Ticket Médio</p>
-                            <p class="text-lg font-bold text-slate-800" id="dash-ticket">R$ 0,00</p>
+                        <div class="p-2 border border-slate-100 rounded">
+                            <p class="text-[10px] text-slate-500 font-bold uppercase mb-1">Lucro Operacional</p>
+                            <p class="text-lg font-bold text-slate-800" id="dash-lucro-op">R$ 0,00</p>
+                            <p class="text-[9px] text-slate-400">Desconsidera aportes/retiradas</p>
                         </div>
-                        <div>
-                            <p class="text-[10px] text-slate-500 uppercase mb-1">Pedidos</p>
-                            <p class="text-lg font-bold text-slate-800" id="dash-pedidos">0</p>
+                        <div class="p-2 border border-slate-100 rounded">
+                            <p class="text-[10px] text-slate-500 font-bold uppercase mb-1">Saídas / Custo</p>
+                            <p class="text-lg font-bold text-rose-600" id="dash-saidas-mes">R$ 0,00</p>
+                            <p class="text-[9px] text-slate-400">Total de despesas</p>
+                        </div>
+                        <div class="p-2 border border-slate-100 rounded">
+                            <p class="text-[10px] text-slate-500 font-bold uppercase mb-1">Taxas Retidas</p>
+                            <p class="text-lg font-bold text-amber-600" id="dash-taxas-mes">R$ 0,00</p>
+                            <p class="text-[9px] text-slate-400">iFood + Cartão</p>
+                        </div>
+                        <div class="p-2 border border-slate-100 rounded flex flex-col justify-between">
+                            <div><p class="text-[10px] text-slate-500 font-bold uppercase mb-1">Tkt Médio / Pedidos</p>
+                            <p class="text-lg font-bold text-slate-800" id="dash-ticket">R$ 0,00</p></div>
+                            <p class="text-[10px] font-bold text-blue-600"><span id="dash-pedidos">0</span> pedidos</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center">
-                    <h3 class="text-base font-semibold text-slate-800 mb-4">Contas a Pagar</h3>
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center p-3 rounded-lg bg-rose-50 border border-rose-100">
-                            <span class="text-sm font-medium text-rose-700">Atrasadas</span>
-                            <span class="font-bold text-rose-600" id="dash-cp-atrasadas">0</span>
-                        </div>
-                        <div class="flex justify-between items-center p-3 rounded-lg bg-amber-50 border border-amber-100">
-                            <span class="text-sm font-medium text-amber-700">Vencem Hoje</span>
-                            <span class="font-bold text-amber-600" id="dash-cp-hoje">0</span>
-                        </div>
-                        <div class="flex justify-between items-center p-3 rounded-lg bg-blue-50 border border-blue-100">
-                            <span class="text-sm font-medium text-blue-700">Próx. 7 Dias</span>
-                            <span class="font-bold text-blue-600" id="dash-cp-7d">0</span>
+                <!-- Info Lateral Dashboard -->
+                <div class="space-y-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                        <h3 class="text-xs font-bold text-slate-500 uppercase mb-3">Melhor Dia de Vendas</h3>
+                        <div class="flex items-center gap-3">
+                            <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg">🏆</div>
+                            <div>
+                                <p class="font-bold text-slate-800" id="dash-melhor-dia">N/A</p>
+                                <p class="text-xs text-slate-500" id="dash-melhor-dia-val">R$ 0,00 em média</p>
+                            </div>
                         </div>
                     </div>
-                    <button onclick="document.querySelector('[data-target=\'contas_pagar\']').click()" class="mt-4 w-full text-xs text-center text-slate-500 hover:text-blue-600 font-medium">Ver todas as contas &rarr;</button>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                        <h3 class="text-xs font-bold text-slate-500 uppercase mb-3">Saídas por Categoria</h3>
+                        <div id="dash-categorias-resumo" class="space-y-2 max-h-32 overflow-y-auto no-scrollbar"></div>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <!-- Calendário Mapa de Vendas -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
                 <h3 class="text-base font-semibold text-slate-800 mb-4">Mapa de Vendas Diárias</h3>
                 <div class="calendar-grid mb-2">
                     <div class="cal-header">Dom</div><div class="cal-header">Seg</div><div class="cal-header">Ter</div>
@@ -224,8 +285,15 @@
                 </div>
                 <div id="dash-calendar" class="calendar-grid"></div>
             </div>
+
+            <!-- Histórico de Meses Anteriores -->
+            <h3 class="text-base font-semibold text-slate-800 mb-4">Evolução Mensal (Últimos 12 meses)</h3>
+            <div id="dash-historico-meses" class="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+                <!-- Cards renderizados via JS -->
+            </div>
         </div>
 
+        <!-- LANÇAMENTOS -->
         <div id="lancamentos" class="tab-content">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 
@@ -236,13 +304,14 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label class="block text-xs font-medium text-slate-700 mb-1">Operação</label>
-                                <select id="tipo" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white" required>
-                                    <option value="venda">Venda do Dia (Lote)</option>
+                                <select id="tipo" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white font-bold" required onchange="handleFormLancamento()">
+                                    <option value="venda">Venda do Dia (Entrada)</option>
                                     <option value="saida">Saída / Despesa / Compra</option>
                                     <option value="entrada">Entrada Avulsa / Outros</option>
-                                    <option value="aporte">Aporte (Sócio)</option>
                                     <option value="repasse">Repasse Recebido (iFood)</option>
                                     <option value="previsao">Previsão (Aviso iFood)</option>
+                                    <option value="ajuste">Ajuste Contábil (Caixa)</option>
+                                    <option value="aporte">Aporte (Sócio)</option>
                                 </select>
                             </div>
                             <div>
@@ -250,28 +319,29 @@
                                 <input type="date" id="data" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
                             </div>
                             <div>
-                                <label id="label-valor" class="block text-xs font-medium text-slate-700 mb-1">Valor Total (R$)</label>
+                                <label id="label-valor" class="block text-xs font-medium text-slate-700 mb-1">Valor Total Bruto (R$)</label>
                                 <input type="number" id="valor" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-bold text-slate-800" step="0.01" required>
                             </div>
                         </div>
 
+                        <!-- Configurações Dinamicas da Venda/Transação -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100" id="bloco-dinamico">
+                            
+                            <div id="bloco-ajuste" class="hidden col-span-2 bg-amber-50 p-3 rounded border border-amber-200 mb-2">
+                                <label class="block text-xs font-bold text-amber-800 mb-1">Tipo de Ajuste Contábil</label>
+                                <select id="ajuste-tipo" class="w-full border-amber-300 rounded px-2 py-1 text-sm bg-white">
+                                    <option value="entrada">Sobra de Caixa (Entrada)</option>
+                                    <option value="saida">Falta / Quebra (Saída)</option>
+                                </select>
+                            </div>
+
                             <div id="bloco-forma">
                                 <label class="block text-xs font-medium text-slate-700 mb-1">Forma de Pagto / Canal</label>
-                                <select id="forma" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white">
-                                    <option value="dinheiro">Dinheiro Físico</option>
-                                    <option value="pix">PIX / Transferência</option>
-                                    <option value="cartao">Cartão (Maquininha)</option>
-                                    <option value="ifood">iFood (Plataforma)</option>
-                                </select>
+                                <select id="forma" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dynamic-formas" onchange="handleFormLancamento()"></select>
                             </div>
                             <div id="bloco-conta">
                                 <label class="block text-xs font-medium text-slate-700 mb-1">Destino / Origem (Conta)</label>
-                                <select id="conta-mov" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white">
-                                    <option value="caixa_fisico">Caixa Físico</option>
-                                    <option value="stone">Conta Stone</option>
-                                    <option value="bau_ton">Baú Ton</option>
-                                </select>
+                                <select id="conta-mov" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dynamic-contas"></select>
                             </div>
 
                             <div id="bloco-qtd" class="hidden">
@@ -280,14 +350,7 @@
                             </div>
                             <div id="bloco-categoria" class="hidden">
                                 <label class="block text-xs font-medium text-slate-700 mb-1">Categoria</label>
-                                <select id="categoria" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white">
-                                    <option value="Insumos/Mercadoria">Insumos/Mercadoria</option>
-                                    <option value="Embalagens">Embalagens</option>
-                                    <option value="Motoboy/Logística">Motoboy/Logística</option>
-                                    <option value="Impostos/Taxas">Impostos/Taxas</option>
-                                    <option value="Manutenção/Estrutura">Manutenção/Estrutura</option>
-                                    <option value="Outros">Outros</option>
-                                </select>
+                                <select id="categoria" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dynamic-categorias"></select>
                             </div>
                             <div id="bloco-socio-aporte" class="hidden">
                                 <label class="block text-xs font-medium text-slate-700 mb-1">Sócio</label>
@@ -295,14 +358,22 @@
                             </div>
                         </div>
 
-                        <div id="bloco-taxa-ifood" class="hidden bg-amber-50 p-4 rounded-lg border border-amber-200">
-                            <label class="block text-xs font-medium text-amber-800 mb-1">Taxas iFood (R$)</label>
-                            <input type="number" id="taxa-ifood" class="w-full md:w-1/3 rounded-md border border-amber-300 px-3 py-2 text-sm bg-white" step="0.01" value="0">
+                        <!-- Calculadora de Taxas para Vendas -->
+                        <div id="bloco-taxas" class="hidden bg-indigo-50 p-4 rounded-lg border border-indigo-200 grid grid-cols-2 gap-4 items-end">
+                            <div>
+                                <label class="block text-xs font-bold text-indigo-800 mb-1">Taxa Cobrada (R$)</label>
+                                <input type="number" id="taxa-valor" class="w-full rounded-md border border-indigo-300 px-3 py-2 text-sm bg-white font-bold" step="0.01" value="0">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-emerald-700 mb-1">Valor Líquido (Recebido) R$</label>
+                                <input type="number" id="valor-liquido" class="w-full rounded-md border border-emerald-300 px-3 py-2 text-sm bg-white font-bold text-emerald-700" step="0.01">
+                            </div>
+                            <p class="text-[10px] text-indigo-600 col-span-2">Dica: Preencha o Bruto e o Líquido, a taxa calcula sozinha. Ou preencha o Bruto e a Taxa.</p>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">Observação</label>
-                            <input type="text" id="obs" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Ex: Detalhes...">
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Observação / Descrição</label>
+                            <input type="text" id="obs" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Detalhes (Obrigatório para saídas)">
                         </div>
 
                         <div class="flex gap-3 pt-2">
@@ -313,29 +384,21 @@
                 </div>
 
                 <div class="bg-slate-50 rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-1 admin-only">
-                    <h2 class="text-base font-semibold text-slate-800 mb-2 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3v18"/><path d="m10 14 7 7 7-7"/><path d="M7 21V3"/><path d="m3 10 4-7 4 7"/></svg> Transferência Interna</h2>
-                    <p class="text-[10px] text-slate-500 mb-4 leading-tight">Mova dinheiro entre suas contas (não altera o patrimônio).</p>
+                    <h2 class="text-base font-semibold text-slate-800 mb-2 flex items-center gap-2">🔄 Transferência Interna</h2>
+                    <p class="text-[10px] text-slate-500 mb-4 leading-tight">Mova dinheiro entre suas contas sem alterar lucros.</p>
                     
                     <form id="form-transferencia" class="space-y-4">
                         <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">Origem (Sai dinheiro)</label>
-                            <select id="transf-origem" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white" required>
-                                <option value="caixa_fisico">Caixa Físico</option>
-                                <option value="stone">Conta Stone</option>
-                                <option value="bau_ton">Baú Ton</option>
-                            </select>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Sai de (Origem)</label>
+                            <select id="transf-origem" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dynamic-contas" required></select>
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">Destino (Entra dinheiro)</label>
-                            <select id="transf-destino" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white" required>
-                                <option value="stone">Conta Stone</option>
-                                <option value="caixa_fisico">Caixa Físico</option>
-                                <option value="bau_ton">Baú Ton</option>
-                            </select>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Entra em (Destino)</label>
+                            <select id="transf-destino" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dynamic-contas" required></select>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div><label class="block text-xs font-medium text-slate-700 mb-1">Data</label><input type="date" id="transf-data" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required></div>
-                            <div><label class="block text-xs font-medium text-slate-700 mb-1">Valor</label><input type="number" id="transf-valor" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-bold text-indigo-700" step="0.01" required></div>
+                            <div><label class="block text-xs font-medium text-slate-700 mb-1">Valor (R$)</label><input type="number" id="transf-valor" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-bold text-indigo-700" step="0.01" required></div>
                         </div>
                         <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-md text-sm transition-colors shadow-sm">Realizar Transferência</button>
                     </form>
@@ -344,7 +407,7 @@
 
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                    <h2 class="text-base font-semibold text-slate-800">Histórico Recente de Lançamentos</h2>
+                    <h2 class="text-base font-semibold text-slate-800">Histórico de Lançamentos</h2>
                 </div>
                 <div class="table-container overflow-x-auto">
                     <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -364,6 +427,7 @@
             </div>
         </div>
 
+        <!-- CONTAS A PAGAR -->
         <div id="contas_pagar" class="tab-content">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-1 border-t-4 border-t-rose-500 h-fit admin-only">
@@ -381,10 +445,7 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs font-medium text-slate-700 mb-1">Categoria</label>
-                                <select id="cp-cat" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white" required>
-                                    <option value="Estrutura">Estrutura (Aluguel, Luz)</option><option value="Fornecedor">Fornecedor / Insumo</option>
-                                    <option value="Impostos">Impostos / Sistema</option><option value="Pessoal">Pessoal / Motoboy</option><option value="Outros">Outros</option>
-                                </select>
+                                <select id="cp-cat" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dynamic-categorias" required></select>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-slate-700 mb-1">Recorrência</label>
@@ -395,9 +456,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-700 mb-1">Conta (Prevista)</label>
-                            <select id="cp-conta" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white">
-                                <option value="stone">Conta Stone</option><option value="caixa_fisico">Caixa Físico</option><option value="bau_ton">Baú Ton</option>
-                            </select>
+                            <select id="cp-conta" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dynamic-contas"></select>
                         </div>
                         <div class="flex gap-2 pt-2">
                             <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-medium py-2 rounded-md text-sm transition">Salvar Conta</button>
@@ -407,10 +466,10 @@
                 </div>
 
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden lg:col-span-2 flex flex-col">
-                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center"><h2 class="text-base font-semibold text-slate-800">Contas a Pagar (Pendentes)</h2></div>
+                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center"><h2 class="text-base font-semibold text-slate-800">Contas Pendentes</h2></div>
                     <div class="overflow-y-auto flex-1 p-0 table-container" style="max-height: 500px;">
                         <table class="min-w-full divide-y divide-slate-200 text-sm">
-                            <thead class="bg-white sticky top-0 z-10 shadow-sm"><tr><th class="px-4 py-3 text-left font-medium text-slate-500">Vencimento</th><th class="px-4 py-3 text-left font-medium text-slate-500">Descrição</th><th class="px-4 py-3 text-right font-medium text-slate-500">Valor</th><th class="px-4 py-3 text-center font-medium text-slate-500">Status</th><th class="px-4 py-3 text-right font-medium text-slate-500 admin-only">Ações</th></tr></thead>
+                            <thead class="bg-white sticky top-0 z-10 shadow-sm"><tr><th class="px-4 py-3 text-left font-medium text-slate-500">Venc.</th><th class="px-4 py-3 text-left font-medium text-slate-500">Detalhes</th><th class="px-4 py-3 text-right font-medium text-slate-500">Valor</th><th class="px-4 py-3 text-center font-medium text-slate-500">Status</th><th class="px-4 py-3 text-right font-medium text-slate-500 admin-only">Ações</th></tr></thead>
                             <tbody class="bg-white divide-y divide-slate-100" id="table-contas-pagar"></tbody>
                         </table>
                     </div>
@@ -424,130 +483,84 @@
             </div>
         </div>
 
+        <!-- FECHAMENTO / CONCILIAÇÃO -->
         <div id="fechamento" class="tab-content">
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
                 <div class="flex flex-col md:flex-row justify-between items-center border-b border-slate-100 pb-4 mb-6">
                     <div>
                         <h2 class="text-xl font-bold text-slate-800">Conciliação de Contas</h2>
-                        <p class="text-xs text-slate-500">Verifique os saldos esperados pelo sistema de acordo com a data.</p>
+                        <p class="text-xs text-slate-500">Bata os saldos reais dos seus apps com os calculados pelo sistema.</p>
                     </div>
                     <div class="mt-4 md:mt-0 bg-slate-50 px-4 py-2 rounded-lg border border-slate-200 flex items-center gap-3">
-                        <label class="text-sm font-medium text-slate-600">Data Base:</label>
+                        <label class="text-sm font-medium text-slate-600">Data Base de Corte:</label>
                         <input type="date" id="fechamento-data" class="bg-transparent font-bold text-slate-800 outline-none" onchange="calcularPreviaFechamento()">
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                    
-                    <div class="bg-slate-800 rounded-xl p-5 text-white shadow relative overflow-hidden">
-                        <h3 class="text-sm font-bold uppercase mb-4 text-slate-300">Gaveta (Caixa Físico)</h3>
-                        <p class="text-[10px] text-slate-400">Saldo Esperado (Sistema)</p>
-                        <p class="text-2xl font-bold text-blue-300 mb-4" id="concil-esp-caixa">R$ 0,00</p>
-                        <div class="admin-only">
-                            <label class="block text-[10px] uppercase text-slate-400 mb-1">Valor Contado Realmente:</label>
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="text-lg font-bold text-slate-500">R$</span>
-                                <input type="number" id="concil-val-caixa" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-lg font-bold text-white outline-none focus:border-blue-400 transition" step="0.01" oninput="calcularDif('caixa')">
-                            </div>
-                            <div class="h-6"><p id="concil-dif-caixa" class="text-xs font-bold px-2 py-0.5 rounded hidden w-fit"></p></div>
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-800 rounded-xl p-5 text-white shadow relative overflow-hidden">
-                        <h3 class="text-sm font-bold uppercase mb-4 text-slate-300">App Stone</h3>
-                        <p class="text-[10px] text-slate-400">Saldo Esperado (Sistema)</p>
-                        <p class="text-2xl font-bold text-emerald-300 mb-4" id="concil-esp-stone">R$ 0,00</p>
-                        <div class="admin-only">
-                            <label class="block text-[10px] uppercase text-slate-400 mb-1">Saldo Real no App:</label>
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="text-lg font-bold text-slate-500">R$</span>
-                                <input type="number" id="concil-val-stone" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-lg font-bold text-white outline-none focus:border-emerald-400 transition" step="0.01" oninput="calcularDif('stone')">
-                            </div>
-                            <div class="h-6"><p id="concil-dif-stone" class="text-xs font-bold px-2 py-0.5 rounded hidden w-fit"></p></div>
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-800 rounded-xl p-5 text-white shadow relative overflow-hidden">
-                        <h3 class="text-sm font-bold uppercase mb-4 text-slate-300">Baú Ton</h3>
-                        <p class="text-[10px] text-slate-400">Saldo Esperado (Sistema)</p>
-                        <p class="text-2xl font-bold text-blue-300 mb-4" id="concil-esp-bau">R$ 0,00</p>
-                        <div class="admin-only">
-                            <label class="block text-[10px] uppercase text-slate-400 mb-1">Saldo Real no App:</label>
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="text-lg font-bold text-slate-500">R$</span>
-                                <input type="number" id="concil-val-bau" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-lg font-bold text-white outline-none focus:border-blue-400 transition" step="0.01" oninput="calcularDif('bau')">
-                            </div>
-                            <div class="h-6"><p id="concil-dif-bau" class="text-xs font-bold px-2 py-0.5 rounded hidden w-fit"></p></div>
-                        </div>
-                    </div>
-
+                <div id="container-conciliacao-paineis" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <!-- Gerado dinamicamente -->
                 </div>
 
                 <div class="bg-blue-50 p-4 rounded-lg text-sm text-blue-800 border border-blue-200 mb-6 admin-only">
-                    <strong>Como funciona:</strong> Ao clicar em "Registrar Conciliação", se houver divergências, o sistema criará <b>Entradas (Sobras)</b> ou <b>Saídas (Quebras)</b> automáticas.
+                    Ao registrar, se houver diferença entre o saldo real digitado e o esperado, o sistema criará <b>Ajustes Contábeis (Entradas/Saídas)</b> automaticamente.
                 </div>
-                
-                <button onclick="executarConciliacao()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-lg text-lg transition-colors shadow admin-only">✅ REGISTRAR CONCILIAÇÃO / AJUSTE DE SALDOS</button>
+                <button onclick="executarConciliacao()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-lg text-lg transition-colors shadow admin-only">✅ REGISTRAR CONCILIAÇÃO</button>
             </div>
 
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hide-print">
-                <div class="p-4 bg-slate-50 border-b border-slate-200"><h3 class="font-bold text-slate-800">Histórico de Fechamentos / Conciliações</h3></div>
+                <div class="p-4 bg-slate-50 border-b border-slate-200"><h3 class="font-bold text-slate-800">Histórico de Fechamentos</h3></div>
                 <div class="table-container max-h-64 overflow-y-auto">
                     <table class="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead class="bg-white sticky top-0"><tr><th class="px-4 py-2 text-left text-slate-500">Data Registro</th><th class="px-4 py-2 text-left text-slate-500">Data Base</th><th class="px-4 py-2 text-left text-slate-500">Detalhes dos Ajustes</th></tr></thead>
+                        <thead class="bg-white sticky top-0"><tr><th class="px-4 py-2 text-left text-slate-500">Registro</th><th class="px-4 py-2 text-left text-slate-500">Data Base</th><th class="px-4 py-2 text-left text-slate-500">Detalhes</th></tr></thead>
                         <tbody class="divide-y divide-slate-100" id="table-fechamentos"></tbody>
                     </table>
                 </div>
             </div>
         </div>
 
+        <!-- RELATORIOS / DRE -->
         <div id="relatorios" class="tab-content">
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 flex justify-between items-end hide-print">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Mês de Referência</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Mês de Referência DRE</label>
                     <div class="flex gap-2">
-                        <input type="month" id="rel-mes" class="rounded-md border border-slate-300 px-3 py-2 text-sm">
-                        <button class="bg-slate-800 text-white font-medium py-2 px-4 rounded-md text-sm" onclick="gerarRelatorio()">Gerar DRE e Extrato</button>
+                        <input type="month" id="rel-mes" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-bold">
+                        <button class="bg-slate-800 text-white font-medium py-2 px-4 rounded-md text-sm" onclick="gerarRelatorio()">Gerar Relatório</button>
                     </div>
                 </div>
-                <button onclick="window.print()" class="print-btn bg-slate-100 text-slate-700 px-4 py-2 rounded-md text-sm border border-slate-300">🖨️ Imprimir Tudo</button>
             </div>
             <div id="rel-resultados" class="hidden space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p class="text-[10px] text-slate-500 uppercase font-bold">Vendas Brutas</p><p class="text-xl font-bold" id="rel-vendas">R$ 0,00</p></div>
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p class="text-[10px] text-rose-500 uppercase font-bold">Saídas (Despesas)</p><p class="text-xl font-bold text-rose-600" id="rel-saidas">R$ 0,00</p></div>
-                    <div class="bg-emerald-50 p-4 rounded-xl shadow-sm border border-emerald-200"><p class="text-[10px] text-emerald-800 uppercase font-bold">Geração Caixa Real</p><p class="text-xl font-bold text-emerald-600" id="rel-caixa-real">R$ 0,00</p></div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p class="text-[10px] text-amber-600 uppercase font-bold">Taxas Retidas (iFood+Cartão)</p><p class="text-xl font-bold text-amber-600" id="rel-taxas">R$ 0,00</p></div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><p class="text-[10px] text-rose-500 uppercase font-bold">Saídas / Custos Físicos</p><p class="text-xl font-bold text-rose-600" id="rel-saidas">R$ 0,00</p></div>
+                    <div class="bg-emerald-50 p-4 rounded-xl shadow-sm border border-emerald-200"><p class="text-[10px] text-emerald-800 uppercase font-bold">Resultado Real (Caixa)</p><p class="text-xl font-bold text-emerald-600" id="rel-caixa-real">R$ 0,00</p></div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 page-break">
-                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm"><h3 class="font-bold text-sm mb-4">Despesas por Categoria</h3><div id="rel-categorias" class="space-y-3"></div></div>
-                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 text-sm text-blue-800"><h3 class="font-bold mb-3">Comportamento iFood</h3><ul class="list-disc list-inside"><li>Vendido: <strong id="rel-txt-venda-ifood">R$ 0,00</strong></li><li>Taxas Retidas: <strong id="rel-txt-taxas-ifood">R$ 0,00</strong></li><li>Repasses Recebidos na Conta: <strong id="rel-txt-repasse">R$ 0,00</strong></li></ul></div>
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm"><h3 class="font-bold text-sm mb-4">Saídas por Categoria (Curva ABC)</h3><div id="rel-categorias" class="space-y-3"></div></div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 text-sm text-blue-800">
+                        <h3 class="font-bold mb-3">Comportamento Plataformas</h3>
+                        <ul class="list-disc list-inside space-y-2">
+                            <li>Vendido via iFood Bruto: <strong id="rel-txt-venda-ifood">R$ 0,00</strong></li>
+                            <li>Taxas iFood Descontadas: <strong id="rel-txt-taxas-ifood" class="text-rose-600">R$ 0,00</strong></li>
+                            <li>Repasses que Caíram na Conta: <strong id="rel-txt-repasse" class="text-emerald-700">R$ 0,00</strong></li>
+                        </ul>
+                    </div>
                 </div>
 
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden table-container overflow-x-auto page-break">
-                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                        <h3 class="font-bold text-slate-800">Extrato Completo do Mês</h3>
-                    </div>
-                    <div class="bg-amber-50 p-3 text-xs text-amber-800 border-b border-amber-200 hide-print admin-only">
-                        <strong>Dica:</strong> Encontrou um erro no mês passado? Clique em "Editar" abaixo para enviar o registro de volta para a aba de Lançamentos e corrigir!
-                    </div>
+                    <div class="p-4 bg-slate-50 border-b border-slate-200"><h3 class="font-bold text-slate-800">Extrato Consolidado do Mês (DRE)</h3></div>
                     <table class="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead class="bg-white">
-                            <tr>
-                                <th class="px-4 py-3 text-left font-medium text-slate-500">Data</th>
-                                <th class="px-4 py-3 text-left font-medium text-slate-500">Operação</th>
-                                <th class="px-4 py-3 text-left font-medium text-slate-500">Conta Relacionada</th>
-                                <th class="px-4 py-3 text-left font-medium text-slate-500">Descrição / Categoria</th>
-                                <th class="px-4 py-3 text-right font-medium text-slate-500">Impacto Caixa</th>
-                                <th class="px-4 py-3 text-right font-medium text-slate-500 hide-print admin-only">Ações</th>
-                            </tr>
-                        </thead>
+                        <thead class="bg-white"><tr><th class="px-4 py-3 text-left text-slate-500">Data</th><th class="px-4 py-3 text-left text-slate-500">Operação</th><th class="px-4 py-3 text-left text-slate-500">Conta/Categoria</th><th class="px-4 py-3 text-right text-slate-500">Impacto Real</th></tr></thead>
                         <tbody class="bg-white divide-y divide-slate-100" id="table-relatorio"></tbody>
                     </table>
                 </div>
             </div>
         </div>
 
+        <!-- SÓCIOS -->
         <div id="socios" class="tab-content">
+            <!-- Funcionalidade mantida idêntica à V6, apenas ajustada responsividade -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-1 hide-print h-fit admin-only">
                     <h2 id="titulo-form-socio" class="text-lg font-semibold text-slate-800 mb-4">Gerenciar Sócio</h2>
@@ -558,47 +571,100 @@
                     </form>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-2 overflow-hidden">
-                    <div class="flex justify-between items-center mb-4"><h2 class="text-lg font-semibold text-slate-800">Posição Societária</h2><button onclick="toggleInativos()" id="btn-toggle-inativos" class="text-xs text-blue-600 hover:underline hide-print admin-only">Mostrar Inativos</button></div>
-                    <div class="table-container overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm"><thead class="bg-slate-50"><tr><th class="px-4 py-2 text-left">Sócio</th><th class="px-4 py-2 text-left">Aportado</th><th class="px-4 py-2 text-left">%</th><th class="px-4 py-2 text-left">Restituído</th><th class="px-4 py-2 text-right">Lucros</th><th class="px-4 py-2 text-right hide-print admin-only">Ações</th></tr></thead><tbody class="divide-y divide-slate-100" id="table-socios"></tbody></table></div>
+                    <div class="flex justify-between items-center mb-4"><h2 class="text-lg font-semibold text-slate-800">Posição Societária</h2></div>
+                    <div class="table-container overflow-x-auto"><table class="min-w-full divide-y divide-slate-200 text-sm"><thead class="bg-slate-50"><tr><th class="px-4 py-2 text-left">Sócio</th><th class="px-4 py-2 text-left">Aportado</th><th class="px-4 py-2 text-left">%</th><th class="px-4 py-2 text-left">Restituído</th><th class="px-4 py-2 text-right">Lucros Recebidos</th><th class="px-4 py-2 text-right hide-print admin-only">Ações</th></tr></thead><tbody class="divide-y divide-slate-100" id="table-socios"></tbody></table></div>
                 </div>
             </div>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 hide-print">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 border-t-4 border-t-indigo-500 admin-only">
-                    <h2 class="text-base font-semibold mb-2">Distribuir Lucro / Restituir</h2>
+                    <h2 class="text-base font-semibold mb-2">Distribuir Lucro / Restituir Capital</h2>
                     <form id="form-distribuicao" class="space-y-4">
-                        <select id="dist-tipo" class="w-full border px-3 py-2 text-sm rounded bg-white"><option value="restituicao">Restituir Capital</option><option value="lucro">Distribuir Lucro</option></select>
-                        <div class="grid grid-cols-2 gap-4"><input type="date" id="dist-data" class="w-full border px-3 py-2 text-sm rounded" required><input type="number" id="dist-valor" class="w-full border px-3 py-2 text-sm rounded" placeholder="Valor Total" step="0.01" required></div>
-                        <select id="dist-conta" class="w-full border px-3 py-2 text-sm rounded bg-white"><option value="stone">Saiu da Stone</option><option value="caixa_fisico">Saiu do Caixa</option><option value="bau_ton">Baú Ton</option></select>
-                        <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded text-sm">Confirmar Saída</button>
+                        <select id="dist-tipo" class="w-full border px-3 py-2 text-sm rounded bg-white"><option value="restituicao">Restituir Capital aos Sócios</option><option value="lucro">Distribuir Lucros</option></select>
+                        <div class="grid grid-cols-2 gap-4"><input type="date" id="dist-data" class="w-full border px-3 py-2 text-sm rounded" required><input type="number" id="dist-valor" class="w-full border px-3 py-2 text-sm rounded" placeholder="Valor Total (R$)" step="0.01" required></div>
+                        <select id="dist-conta" class="w-full border px-3 py-2 text-sm rounded bg-white dynamic-contas"></select>
+                        <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded text-sm font-bold">Confirmar Saída</button>
                     </form>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 overflow-hidden flex flex-col"><h3 class="font-semibold mb-4">Histórico Repasses</h3><div class="overflow-y-auto flex-1 space-y-2 max-h-48" id="lista-pagamentos"></div></div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col"><h3 class="font-semibold mb-4">Histórico Repasses</h3><div class="overflow-y-auto flex-1 space-y-2 max-h-48" id="lista-pagamentos"></div></div>
             </div>
         </div>
 
+        <!-- SISTEMA / CONFIGURAÇÕES -->
         <div id="sistema" class="tab-content admin-only">
-            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-800">
-                <strong>Servidor Conectado:</strong> O sistema está rodando em nuvem via Firebase. Seus dados estão seguros e sincronizados.
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 hide-print">
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                    <h2 class="text-lg font-semibold text-slate-800 mb-2">Backup Manual</h2>
-                    <p class="text-xs text-slate-500 mb-4">Faça o download completo dos seus dados na nuvem para ter uma cópia de segurança física.</p>
-                    <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm transition-colors w-full" onclick="exportarBackup()">Baixar Arquivo JSON</button>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <!-- Configurações Dinâmicas -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-2">
+                    <h2 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-2">Configurações de Listas (Categorias, Contas, etc)</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Categorias -->
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-700 mb-2">Categorias de Despesa</h3>
+                            <ul id="lista-config-categorias" class="text-xs space-y-1 mb-2 max-h-32 overflow-y-auto bg-slate-50 p-2 border rounded"></ul>
+                            <div class="flex gap-2">
+                                <input type="text" id="novo-cat" placeholder="Nova categoria..." class="w-full text-sm border px-2 py-1 rounded">
+                                <button onclick="addConfig('categorias', 'novo-cat')" class="bg-slate-800 text-white px-3 rounded text-sm">+</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Formas Pagto -->
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-700 mb-2">Canais / Formas de Pagto</h3>
+                            <ul id="lista-config-formas" class="text-xs space-y-1 mb-2 max-h-32 overflow-y-auto bg-slate-50 p-2 border rounded"></ul>
+                            <div class="flex gap-2">
+                                <input type="text" id="novo-forma-nome" placeholder="Nome" class="w-1/2 text-sm border px-2 py-1 rounded">
+                                <input type="text" id="novo-forma-id" placeholder="ID (ex: ifood)" class="w-1/2 text-sm border px-2 py-1 rounded">
+                                <button onclick="addConfig('formas', 'novo-forma-nome', 'novo-forma-id')" class="bg-slate-800 text-white px-3 rounded text-sm">+</button>
+                            </div>
+                            <p class="text-[9px] text-slate-400 mt-1">Nomes como 'ifood' ou 'cartao' ativam a calculadora de taxas.</p>
+                        </div>
+
+                        <!-- Contas -->
+                        <div class="md:col-span-2 border-t pt-4">
+                            <h3 class="text-sm font-bold text-slate-700 mb-2">Contas / Caixas / Carteiras</h3>
+                            <ul id="lista-config-contas" class="text-xs space-y-1 mb-2 max-h-32 overflow-y-auto bg-slate-50 p-2 border rounded"></ul>
+                            <div class="flex gap-2">
+                                <input type="text" id="novo-conta-nome" placeholder="Nome Conta (ex: Sicoob)" class="w-1/2 text-sm border px-2 py-1 rounded">
+                                <input type="text" id="novo-conta-id" placeholder="ID (ex: sicoob)" class="w-1/2 text-sm border px-2 py-1 rounded">
+                                <button onclick="addConfig('contas', 'novo-conta-nome', 'novo-conta-id')" class="bg-slate-800 text-white px-3 rounded text-sm">+</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                    <h2 class="text-lg font-semibold text-slate-800 mb-2">Importar Dados (Migração offline)</h2>
-                    <p class="text-xs text-slate-500 mb-4 text-rose-500">Cuidado: Subir um arquivo de backup irá <b>substituir permanentemente</b> os dados que estão na nuvem agora.</p>
-                    <input type="file" id="file-import" accept=".json" class="block w-full text-xs text-slate-500 mb-2">
-                    <button class="bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-md text-sm transition-colors w-full" onclick="importarBackup()">Restaurar para a Nuvem</button>
+
+                <!-- Backup e Wipe -->
+                <div class="space-y-6">
+                    <!-- CSV IMPORT TOOL -->
+                    <div class="bg-emerald-50 rounded-xl shadow-sm border border-emerald-200 p-5">
+                        <h2 class="text-sm font-bold text-emerald-800 mb-2">Importar Planilha Legada (CSV)</h2>
+                        <p class="text-[10px] text-emerald-700 mb-3">Selecione seus arquivos .csv antigos para carregar o histórico. Ele lê e converte os formatos monetários da planilha.</p>
+                        <input type="file" id="file-import-csv" accept=".csv" class="block w-full text-xs text-slate-600 mb-2">
+                        <button class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-md text-sm transition-colors w-full shadow" onclick="importarCSV()">Importar Dados da Planilha</button>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                        <h2 class="text-sm font-bold text-slate-800 mb-2">Backup Manual Nuvem</h2>
+                        <button class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md text-sm transition-colors w-full mb-3 shadow" onclick="exportarBackup()">Download Completo (JSON)</button>
+                        <hr class="my-3">
+                        <h2 class="text-sm font-bold text-slate-800 mb-2">Restaurar Backup</h2>
+                        <input type="file" id="file-import" accept=".json" class="block w-full text-xs text-slate-500 mb-2">
+                        <button class="bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-md text-sm transition-colors w-full shadow" onclick="importarBackup()">Substituir Nuvem</button>
+                    </div>
+
+                    <div class="bg-rose-50 rounded-xl shadow-sm border border-rose-200 p-5">
+                        <h2 class="text-sm font-bold text-rose-800 mb-2">Zona de Perigo</h2>
+                        <p class="text-xs text-rose-600 mb-3">Apaga transações, meses históricos e contas a pagar do servidor.</p>
+                        <button onclick="apagarTudoSistema()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded text-sm shadow">Apagar Todos os Dados</button>
+                    </div>
                 </div>
             </div>
 
             <div class="bg-slate-800 rounded-xl shadow-sm overflow-hidden text-white">
-                <div class="p-4 border-b border-slate-700 flex justify-between items-center"><h3 class="font-bold">Log de Auditoria de Segurança</h3><span class="text-xs bg-slate-700 px-2 py-1 rounded">Visualização Admin</span></div>
-                <div class="table-container max-h-96 overflow-y-auto">
+                <div class="p-4 border-b border-slate-700 flex justify-between items-center"><h3 class="font-bold">Log de Auditoria</h3></div>
+                <div class="table-container max-h-64 overflow-y-auto">
                     <table class="min-w-full text-sm">
-                        <thead class="bg-slate-900 text-slate-300"><tr><th class="px-4 py-2 text-left">Data/Hora</th><th class="px-4 py-2 text-left">Ação</th><th class="px-4 py-2 text-left">Tela/Módulo</th><th class="px-4 py-2 text-left">Detalhes (Antes -> Depois)</th></tr></thead>
+                        <thead class="bg-slate-900 text-slate-300"><tr><th class="px-4 py-2 text-left">Data/Hora</th><th class="px-4 py-2 text-left">Ação</th><th class="px-4 py-2 text-left">Tela/Módulo</th><th class="px-4 py-2 text-left">Detalhes</th></tr></thead>
                         <tbody class="divide-y divide-slate-700 text-slate-400" id="table-auditoria"></tbody>
                     </table>
                 </div>
@@ -623,24 +689,26 @@
         /* === ESTADO DO SISTEMA === */
         let transacoes = [];
         let pagamentosSocios = [];
-        let sociosBase = [
-            { id: 1, nome: 'Wellington', ativo: true }, 
-            { id: 2, nome: 'Natan', ativo: true }, 
-            { id: 3, nome: 'Diego', ativo: true }
-        ];
+        let sociosBase = [{ id: 1, nome: 'Wellington', ativo: true }, { id: 2, nome: 'Natan', ativo: true }, { id: 3, nome: 'Diego', ativo: true }];
         let metaMensal = 15000;
         let contasPagar = [];
         let fechamentos = [];
         let auditoria = [];
+        let historicoMeses = []; // Guarda consolidado de meses passados
 
-        const NOMES_CONTAS = {
-            'caixa_fisico': 'Caixa Físico',
-            'stone': 'Conta Stone',
-            'bau_ton': 'Baú Ton',
-            'ifood_pendente': 'Pendente iFood'
+        // Configurações Dinâmicas Default
+        let configListas = {
+            contas: [{id: 'caixa_fisico', nome: 'Caixa Físico'}, {id: 'stone', nome: 'Conta Stone'}, {id: 'bau_ton', nome: 'Baú Ton'}],
+            formas: [{id: 'dinheiro', nome: 'Dinheiro Físico'}, {id: 'pix', nome: 'PIX / Transf'}, {id: 'cartao', nome: 'Cartão Maquina'}, {id: 'ifood', nome: 'iFood'}],
+            categorias: ['Insumos/Mercadoria', 'Embalagens', 'Motoboy/Logística', 'Impostos/Taxas', 'Manutenção/Estrutura', 'Outros']
         };
 
-        let exibirInativosSocio = false;
+        // Helper para pegar o nome da conta baseado na config
+        const getNomeConta = (id) => { 
+            if(id === 'ifood_pendente') return "Pendente iFood";
+            const c = configListas.contas.find(x => x.id === id); return c ? c.nome : id; 
+        };
+
         let currentUserRole = null;
         let firebaseDB = null;
 
@@ -648,15 +716,20 @@
         const hojeStr = hoje.toISOString().split('T')[0];
         const mesStr = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0');
 
-        /* === SISTEMA DE LOGIN E AUTENTICAÇÃO === */
+        /* === UTILITÁRIOS === */
+        const formatMoney = (v) => Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const formatData = (d) => { if(!d) return '-'; const [y, m, day] = d.substring(0,10).split('-'); return `${day}/${m}/${y}`; };
+        
+        function abrirModal(id) { document.getElementById(id).classList.add('active'); }
+        function fecharModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        /* === SISTEMA DE LOGIN === */
         document.addEventListener("DOMContentLoaded", () => {
             currentUserRole = sessionStorage.getItem('delivery_role');
             if(!currentUserRole) {
-                // Não logado: Esconde o Loader e mostra o Login
                 document.getElementById('loader').classList.add('hidden');
                 document.getElementById('login-overlay').classList.remove('hidden');
             } else {
-                // Já logado: Aplica a role visualmente e conecta no Firebase
                 document.body.classList.add(`role-${currentUserRole}`);
                 iniciarConexaoFirebase();
             }
@@ -665,81 +738,44 @@
         window.fazerLogin = function() {
             const u = document.getElementById('login-user').value.trim().toLowerCase();
             const p = document.getElementById('login-pass').value.trim();
-            const err = document.getElementById('login-err');
-            
-            if (u === 'admin' && p === '2218') {
-                logar('admin');
-            } else if (u === 'operador' && p === '1234') {
-                logar('operador');
-            } else {
-                err.classList.remove('hidden');
-            }
+            if (u === 'admin' && p === '2218') logar('admin');
+            else if (u === 'operador' && p === '1234') logar('operador');
+            else document.getElementById('login-err').classList.remove('hidden');
         }
 
         function logar(role) {
-            currentUserRole = role;
-            sessionStorage.setItem('delivery_role', role);
+            currentUserRole = role; sessionStorage.setItem('delivery_role', role);
             document.body.classList.add(`role-${role}`);
-            
-            // Troca as telas
             document.getElementById('login-overlay').classList.add('hidden');
             document.getElementById('loader').classList.remove('hidden');
-            
             iniciarConexaoFirebase();
         }
 
-        window.sair = function() {
-            if(confirm("Deseja realmente sair da sessão atual?")) {
-                sessionStorage.removeItem('delivery_role');
-                location.reload();
-            }
-        }
+        window.sair = function() { if(confirm("Sair?")) { sessionStorage.removeItem('delivery_role'); location.reload(); } }
 
-        // INICIALIZAÇÃO FIREBASE COM TRAVA DE SEGURANÇA (Watchdog)
+        /* === FIREBASE INICIALIZAÇÃO E SALVAMENTO === */
         function iniciarConexaoFirebase() {
             try {
                 if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
                 firebaseDB = firebase.database();
-                
                 let conectou = false;
                 const watchdog = setTimeout(() => {
-                    if(!conectou) {
-                        console.warn("A conexão com o Firebase está bloqueada. Iniciando offline.");
-                        document.getElementById('loader').classList.add('hidden');
-                        alert("⚠️ AVISO: A conexão com o banco de dados falhou ou as Regras do Firebase estão bloqueadas. O sistema abrirá em modo local para você não ficar travado.");
-                        init();
-                    }
+                    if(!conectou) { console.warn("Modo Offline."); document.getElementById('loader').classList.add('hidden'); init(); }
                 }, 6000);
 
                 firebaseDB.ref('/').once('value').then((snapshot) => {
-                    conectou = true;
-                    clearTimeout(watchdog);
+                    conectou = true; clearTimeout(watchdog);
                     const data = snapshot.val();
                     if (data) {
-                        transacoes = data.transacoes || [];
-                        pagamentosSocios = data.pagamentosSocios || [];
-                        sociosBase = data.sociosBase || sociosBase;
-                        metaMensal = data.metaMensal || 15000;
-                        contasPagar = data.contasPagar || [];
-                        fechamentos = data.fechamentos || [];
-                        auditoria = data.auditoria || [];
+                        transacoes = data.transacoes || []; pagamentosSocios = data.pagamentosSocios || []; sociosBase = data.sociosBase || sociosBase;
+                        metaMensal = data.metaMensal || 15000; contasPagar = data.contasPagar || []; fechamentos = data.fechamentos || []; 
+                        auditoria = data.auditoria || []; historicoMeses = data.historicoMeses || [];
+                        if(data.configListas) configListas = data.configListas;
                     }
                     document.getElementById('loader').classList.add('hidden');
                     init();
-                }).catch((error) => {
-                    conectou = true;
-                    clearTimeout(watchdog);
-                    console.error("Erro Firebase: ", error);
-                    document.getElementById('loader').classList.add('hidden');
-                    alert("Erro de Permissão no Firebase: " + error.message);
-                    init();
-                });
-
-            } catch (e) {
-                document.getElementById('loader').classList.add('hidden');
-                alert("Erro crítico ao tentar inicializar o Firebase.");
-                init();
-            }
+                }).catch((e) => { conectou = true; clearTimeout(watchdog); document.getElementById('loader').classList.add('hidden'); init(); });
+            } catch (e) { document.getElementById('loader').classList.add('hidden'); init(); }
         }
 
         function init() {
@@ -751,50 +787,75 @@
             document.getElementById('dash-filtro-mes').value = mesStr;
             document.getElementById('input-meta').value = metaMensal;
 
+            popularSelectsDinamicos();
             handleFormLancamento(); 
             atualizarTelas();
         }
 
-        const formatMoney = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        const formatData = (d) => { if(!d) return '-'; const [y, m, day] = d.substring(0,10).split('-'); return `${day}/${m}/${y}`; };
-        
         window.salvarDados = function(noRefresh = false) {
-            // SEGURANÇA EXTRA FRONT-END: Se operador tentar forçar o script, é barrado
-            if(currentUserRole !== 'admin') {
-                alert("Operação bloqueada! Seu perfil de 'Operador' tem permissão apenas para visualização.");
-                return;
-            }
-
-            const dados = { transacoes, pagamentosSocios, sociosBase, metaMensal, contasPagar, fechamentos, auditoria };
-            
-            if(firebaseDB) {
-                firebaseDB.ref('/').set(dados).then(() => {
-                    if(!noRefresh) atualizarTelas();
-                }).catch((error) => {
-                    console.error("Erro ao salvar no Firebase: ", error);
-                    alert("Atenção: Falha ao tentar salvar na Nuvem! Verifique sua internet.");
-                });
-            } else {
-                if(!noRefresh) atualizarTelas();
-            }
+            if(currentUserRole !== 'admin') { alert("Operador tem apenas permissão de visualização."); return; }
+            const dados = { transacoes, pagamentosSocios, sociosBase, metaMensal, contasPagar, fechamentos, auditoria, historicoMeses, configListas };
+            if(firebaseDB) firebaseDB.ref('/').set(dados).then(() => { if(!noRefresh) atualizarTelas(); }).catch(e => alert("Falha ao salvar na Nuvem."));
+            else if(!noRefresh) atualizarTelas();
         }
 
-        window.salvarMeta = function() {
+        function logAuditoria(tela, acao, detalhes) {
             if(currentUserRole !== 'admin') return;
-            const v = document.getElementById('input-meta').value;
-            if(v) { metaMensal = parseFloat(v); salvarDados(); logAuditoria('Metas', 'Edição', 'Meta alterada', '', v); alert('Meta salva!'); }
+            auditoria.unshift({ id: Date.now(), dataHora: new Date().toLocaleString('pt-BR'), usuario: 'Admin', tela, acao, detalhes });
+            if(auditoria.length > 300) auditoria.pop();
         }
 
-        function logAuditoria(tela, acao, detalhes, oldV = '', newV = '') {
-            if(currentUserRole !== 'admin') return; // Operador não gera log de alteração pois não altera
-            auditoria.unshift({
-                id: Date.now(), dataHora: new Date().toLocaleString('pt-BR'),
-                usuario: 'Admin', tela, acao, detalhes,
-                oldV: typeof oldV === 'object' ? JSON.stringify(oldV) : oldV,
-                newV: typeof newV === 'object' ? JSON.stringify(newV) : newV
-            });
-            if(auditoria.length > 500) auditoria.pop();
+        window.apagarTudoSistema = function() {
+            if(currentUserRole !== 'admin') return;
+            let p = prompt("ZONA DE PERIGO! Isso apagará tudo.\nDigite APAGAR para confirmar:");
+            if(p === "APAGAR") {
+                transacoes = []; pagamentosSocios = []; contasPagar = []; fechamentos = []; auditoria = []; historicoMeses = [];
+                logAuditoria('Sistema', 'WIPE', 'Banco de dados zerado'); salvarDados(true);
+                alert("Sistema zerado com sucesso."); location.reload();
+            } else { alert("Operação cancelada."); }
         }
+
+        /* === CONFIGURAÇÕES DINÂMICAS === */
+        function popularSelectsDinamicos() {
+            // Preenche Contas
+            const optionsContas = configListas.contas.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+            document.querySelectorAll('.dynamic-contas').forEach(el => { const v = el.value; el.innerHTML = optionsContas; if(v) el.value = v; });
+            
+            // Preenche Formas
+            const optionsFormas = configListas.formas.map(f => `<option value="${f.id}">${f.nome}</option>`).join('');
+            document.querySelectorAll('.dynamic-formas').forEach(el => { const v = el.value; el.innerHTML = optionsFormas; if(v) el.value = v; });
+
+            // Preenche Categorias
+            const optionsCat = configListas.categorias.map(c => `<option value="${c}">${c}</option>`).join('');
+            document.querySelectorAll('.dynamic-categorias').forEach(el => { const v = el.value; el.innerHTML = optionsCat; if(v) el.value = v; });
+
+            // Renderiza listas na aba de Configuração
+            document.getElementById('lista-config-categorias').innerHTML = configListas.categorias.map((c,i) => `<li class="flex justify-between items-center py-1 border-b"><span>${c}</span> <button onclick="removerConfig('categorias', ${i})" class="text-rose-500 hover:font-bold">x</button></li>`).join('');
+            document.getElementById('lista-config-formas').innerHTML = configListas.formas.map((f,i) => `<li class="flex justify-between items-center py-1 border-b"><span>${f.nome} <small>(${f.id})</small></span> <button onclick="removerConfig('formas', ${i})" class="text-rose-500 hover:font-bold">x</button></li>`).join('');
+            document.getElementById('lista-config-contas').innerHTML = configListas.contas.map((c,i) => `<li class="flex justify-between items-center py-1 border-b"><span>${c.nome} <small>(${c.id})</small></span> <button onclick="removerConfig('contas', ${i})" class="text-rose-500 hover:font-bold">x</button></li>`).join('');
+        }
+
+        window.addConfig = function(tipo, inputNomeId, inputIdStr) {
+            const valNome = document.getElementById(inputNomeId).value.trim();
+            if(!valNome) return;
+            if(tipo === 'categorias') configListas.categorias.push(valNome);
+            else {
+                const valId = document.getElementById(inputIdStr).value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+                if(!valId) return alert("ID inválido");
+                configListas[tipo].push({id: valId, nome: valNome});
+            }
+            document.getElementById(inputNomeId).value = '';
+            if(inputIdStr) document.getElementById(inputIdStr).value = '';
+            logAuditoria('Configurações', 'Add '+tipo, valNome);
+            salvarDados(); popularSelectsDinamicos();
+        }
+
+        window.removerConfig = function(tipo, idx) {
+            if(confirm("Remover esta opção das listas?")) {
+                configListas[tipo].splice(idx, 1); salvarDados(); popularSelectsDinamicos();
+            }
+        }
+
 
         /* === NAVEGAÇÃO === */
         document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -804,43 +865,91 @@
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 const target = clicked.getAttribute('data-target'); document.getElementById(target).classList.add('active');
                 if(target === 'socios' || target === 'lancamentos') popularSelectSocios();
-                if(target === 'fechamento') calcularPreviaFechamento();
+                if(target === 'fechamento') renderPaineisConciliacao();
             });
         });
 
-        /* === LANÇAMENTOS (CAIXA E TRANSFERÊNCIAS) === */
-        document.getElementById('tipo').addEventListener('change', handleFormLancamento);
-        document.getElementById('forma').addEventListener('change', handleFormLancamento);
+        /* === LANÇAMENTOS (AUTO CALC + AJUSTES) === */
+        window.handleFormLancamento = function() {
+            const tipo = document.getElementById('tipo').value; 
+            const forma = document.getElementById('forma').value;
+            const els = { bDin: document.getElementById('bloco-dinamico'), bForma: document.getElementById('bloco-forma'), bConta: document.getElementById('bloco-conta'), bQtd: document.getElementById('bloco-qtd'), bCat: document.getElementById('bloco-categoria'), bSocio: document.getElementById('bloco-socio-aporte'), bTaxas: document.getElementById('bloco-taxas'), lVal: document.getElementById('label-valor'), selConta: document.getElementById('conta-mov'), bAjuste: document.getElementById('bloco-ajuste') };
+            
+            els.bDin.classList.remove('hidden'); els.bForma.classList.remove('hidden'); els.bConta.classList.remove('hidden'); els.bQtd.classList.add('hidden'); els.bSocio.classList.add('hidden'); els.bTaxas.classList.add('hidden'); els.bCat.classList.add('hidden'); els.bAjuste.classList.add('hidden');
+            els.lVal.innerText = "Valor Total Bruto (R$)";
 
-        function handleFormLancamento() {
-            const tipo = document.getElementById('tipo').value; const forma = document.getElementById('forma').value;
-            const els = { bDin: document.getElementById('bloco-dinamico'), bForma: document.getElementById('bloco-forma'), bConta: document.getElementById('bloco-conta'), bQtd: document.getElementById('bloco-qtd'), bCat: document.getElementById('bloco-categoria'), bSocio: document.getElementById('bloco-socio-aporte'), bTaxa: document.getElementById('bloco-taxa-ifood'), lVal: document.getElementById('label-valor'), selConta: document.getElementById('conta-mov') };
-            els.bDin.classList.remove('hidden'); els.bForma.classList.remove('hidden'); els.bConta.classList.remove('hidden'); els.bQtd.classList.add('hidden'); els.bSocio.classList.add('hidden'); els.bTaxa.classList.add('hidden'); els.bCat.classList.add('hidden');
-            document.getElementById('taxa-ifood').required = false; document.getElementById('socio-aporte').required = false; els.lVal.innerText = "Valor Total (R$)";
+            if (tipo === 'venda') { 
+                els.bQtd.classList.remove('hidden'); 
+                if (forma === 'ifood' || forma === 'cartao') { els.bTaxas.classList.remove('hidden'); }
+                if (forma === 'ifood') els.bConta.classList.add('hidden'); 
+            }
+            else if (tipo === 'saida') { els.bCat.classList.remove('hidden'); els.lVal.innerText = "Valor Pago (R$)"; }
+            else if (tipo === 'repasse') { els.bDin.classList.add('hidden'); els.lVal.innerText = "Valor do Repasse (R$)"; }
+            else if (tipo === 'aporte') { els.bSocio.classList.remove('hidden'); }
+            else if (tipo === 'previsao') { els.bDin.classList.add('hidden'); els.lVal.innerText = "Previsão (R$)"; }
+            else if (tipo === 'ajuste') { els.bAjuste.classList.remove('hidden'); els.bForma.classList.add('hidden'); els.lVal.innerText = "Valor do Ajuste (R$)"; }
+        }
 
-            if(forma === 'dinheiro') els.selConta.value = 'caixa_fisico'; else if(forma === 'pix' || forma === 'cartao') els.selConta.value = 'stone';
+        // Calculadora Bruto/Líquido/Taxa
+        document.getElementById('valor').addEventListener('input', recalcularTaxa);
+        document.getElementById('taxa-valor').addEventListener('input', recalcularLiquido);
+        document.getElementById('valor-liquido').addEventListener('input', recalcularDaLiquido);
 
-            if (tipo === 'venda') { els.bQtd.classList.remove('hidden'); if (forma === 'ifood') { els.bTaxa.classList.remove('hidden'); document.getElementById('taxa-ifood').required = true; els.bConta.classList.add('hidden'); } }
-            else if (tipo === 'saida') { els.bCat.classList.remove('hidden'); }
-            else if (tipo === 'repasse') { els.bDin.classList.add('hidden'); els.lVal.innerText = "Valor na Conta"; els.selConta.value = 'stone'; }
-            else if (tipo === 'aporte') { els.bSocio.classList.remove('hidden'); document.getElementById('socio-aporte').required = true; }
-            else if (tipo === 'previsao') { els.bDin.classList.add('hidden'); els.lVal.innerText = "Valor Previsto"; }
+        function recalcularTaxa() {
+            let bruto = parseFloat(document.getElementById('valor').value || 0);
+            let taxa = parseFloat(document.getElementById('taxa-valor').value || 0);
+            document.getElementById('valor-liquido').value = (bruto - taxa).toFixed(2);
+        }
+        function recalcularLiquido() { recalcularTaxa(); }
+        function recalcularDaLiquido() {
+            let bruto = parseFloat(document.getElementById('valor').value || 0);
+            let liq = parseFloat(document.getElementById('valor-liquido').value || 0);
+            if(bruto > 0) document.getElementById('taxa-valor').value = (bruto - liq).toFixed(2);
         }
 
         document.getElementById('form-lancamento').addEventListener('submit', function(e) {
             e.preventDefault(); if(currentUserRole !== 'admin') return;
+            const editId = document.getElementById('edit-id').value; 
             const dataStr = document.getElementById('data').value;
-            const editId = document.getElementById('edit-id').value; const tipo = document.getElementById('tipo').value; const bruto = parseFloat(document.getElementById('valor').value);
+            let tipo = document.getElementById('tipo').value; 
+            const bruto = parseFloat(document.getElementById('valor').value);
+            
             let forma = document.getElementById('forma').value;
             let conta = document.getElementById('conta-mov').value;
+            let taxa = 0; let liquido = bruto; let obs = document.getElementById('obs').value;
+
+            // Tratamento Específico por Tipo
             if(tipo === 'venda' && forma === 'ifood') conta = 'ifood_pendente';
-            if(tipo === 'previsao') conta = 'ifood_pendente';
-            if(tipo === 'repasse' || tipo === 'previsao') forma = 'ifood_repasse';
-            if(tipo === 'repasse') conta = document.getElementById('bloco-dinamico').classList.contains('hidden') ? 'stone' : document.getElementById('conta-mov').value;
-            const taxa = (tipo === 'venda' && forma === 'ifood') ? parseFloat(document.getElementById('taxa-ifood').value || 0) : 0;
-            
-            const obj = { id: editId ? parseFloat(editId) : Date.now(), tipo, data: dataStr, forma, conta, valorBruto: bruto, taxa, valorLiquido: bruto - taxa, qtdPedidos: tipo === 'venda' ? parseInt(document.getElementById('qtd-pedidos').value || 0) : 0, categoria: tipo === 'saida' ? document.getElementById('categoria').value : '', obs: document.getElementById('obs').value, idSocioAporte: tipo === 'aporte' ? parseInt(document.getElementById('socio-aporte').value) : null };
-            if (editId) { const idx = transacoes.findIndex(t => t.id == editId); logAuditoria('Caixa', 'Edição', 'Lancamento editado', transacoes[idx], obj); transacoes[idx] = obj; } else { transacoes.push(obj); logAuditoria('Caixa', 'Criação', `Novo ${tipo}`, '', obj.valorLiquido); }
+            if(tipo === 'previsao') { conta = 'ifood_pendente'; forma = 'ifood_repasse'; }
+            if(tipo === 'repasse') { forma = 'ifood_repasse'; conta = document.getElementById('bloco-dinamico').classList.contains('hidden') ? configListas.contas[0].id : conta; } // Fallback
+            if(tipo === 'ajuste') { 
+                let tAj = document.getElementById('ajuste-tipo').value;
+                tipo = tAj; // vira 'entrada' ou 'saida'
+                forma = 'ajuste_contabil';
+                obs = `[Ajuste] ${obs}`;
+            }
+
+            if(tipo === 'venda' && (forma === 'ifood' || forma === 'cartao')) {
+                taxa = parseFloat(document.getElementById('taxa-valor').value || 0);
+                liquido = bruto - taxa;
+            }
+
+            const obj = { 
+                id: editId ? parseFloat(editId) : Date.now(), 
+                tipo, data: dataStr, forma, conta, 
+                valorBruto: bruto, taxa, valorLiquido: liquido, 
+                qtdPedidos: tipo === 'venda' ? parseInt(document.getElementById('qtd-pedidos').value || 0) : 0, 
+                categoria: tipo === 'saida' ? document.getElementById('categoria').value : '', 
+                obs: obs, 
+                idSocioAporte: tipo === 'aporte' ? parseInt(document.getElementById('socio-aporte').value) : null 
+            };
+
+            if (editId) { 
+                const idx = transacoes.findIndex(t => t.id == editId); 
+                transacoes[idx] = obj; 
+            } else { 
+                transacoes.push(obj); logAuditoria('Lançamentos', 'Criado '+tipo, `R$ ${liquido}`);
+            }
             salvarDados(); cancelarEdicao();
         });
 
@@ -849,289 +958,577 @@
             const dataStr = document.getElementById('transf-data').value; const o = document.getElementById('transf-origem').value; const d = document.getElementById('transf-destino').value;
             if(o === d) return alert("Origem e Destino devem ser diferentes!"); const v = parseFloat(document.getElementById('transf-valor').value);
             const idBase = Date.now();
-            transacoes.push({ id: idBase, tipo: 'transferencia_out', data: dataStr, conta: o, valorLiquido: v, obs: `Para: ${NOMES_CONTAS[d]}` });
-            transacoes.push({ id: idBase+1, tipo: 'transferencia_in', data: dataStr, conta: d, valorLiquido: v, obs: `De: ${NOMES_CONTAS[o]}` });
-            logAuditoria('Caixa', 'Transferência', `${NOMES_CONTAS[o]} -> ${NOMES_CONTAS[d]}`, '', v); salvarDados(); this.reset(); document.getElementById('transf-data').value = hojeStr; alert('Transferência salva!');
+            transacoes.push({ id: idBase, tipo: 'transferencia_out', data: dataStr, conta: o, valorLiquido: v, obs: `Para: ${getNomeConta(d)}` });
+            transacoes.push({ id: idBase+1, tipo: 'transferencia_in', data: dataStr, conta: d, valorLiquido: v, obs: `De: ${getNomeConta(o)}` });
+            salvarDados(); this.reset(); alert('Transferência OK!');
         });
 
         window.editarTx = function(id) {
-            if(currentUserRole !== 'admin') return alert("Acesso Negado.");
+            if(currentUserRole !== 'admin') return;
             const tx = transacoes.find(t => t.id === id); if(!tx) return;
-            if(tx.tipo.startsWith('transferencia')) return alert("Transferências devem ser excluídas e refeitas.");
-            if(tx.idContaPagar) alert("Aviso: Saída vinculada a uma Conta Pagar. Editar aqui não altera a conta original.");
+            if(tx.tipo.startsWith('transferencia')) return alert("Para transferência, exclua as duas pontas e refaça.");
             
             document.querySelector('[data-target="lancamentos"]').click();
-            document.getElementById('edit-id').value = tx.id; document.getElementById('tipo').value = tx.tipo; document.getElementById('data').value = tx.data; document.getElementById('forma').value = tx.forma === 'ifood_repasse' ? 'pix' : tx.forma; document.getElementById('valor').value = tx.valorBruto; document.getElementById('conta-mov').value = tx.conta || 'caixa_fisico'; document.getElementById('taxa-ifood').value = tx.taxa || 0; document.getElementById('qtd-pedidos').value = tx.qtdPedidos || 0; document.getElementById('obs').value = tx.obs || '';
+            document.getElementById('edit-id').value = tx.id; 
+            document.getElementById('tipo').value = (tx.forma==='ajuste_contabil') ? 'ajuste' : tx.tipo; 
+            document.getElementById('data').value = tx.data; 
+            if(tx.forma !== 'ajuste_contabil') document.getElementById('forma').value = tx.forma === 'ifood_repasse' ? configListas.formas[1].id : tx.forma; 
+            document.getElementById('valor').value = tx.valorBruto; 
+            document.getElementById('conta-mov').value = tx.conta; 
+            document.getElementById('taxa-valor').value = tx.taxa || 0;
+            document.getElementById('valor-liquido').value = tx.valorLiquido;
+            document.getElementById('qtd-pedidos').value = tx.qtdPedidos || 0; 
+            document.getElementById('obs').value = tx.obs || '';
+            
+            if(tx.forma === 'ajuste_contabil') document.getElementById('ajuste-tipo').value = tx.tipo;
             if(tx.tipo === 'saida' || tx.tipo === 'entrada') document.getElementById('categoria').value = tx.categoria || 'Outros';
             if(tx.tipo === 'aporte') document.getElementById('socio-aporte').value = tx.idSocioAporte;
-            document.getElementById('titulo-form-lancamento').innerText = 'Editar Lançamento (Passado/Atual)'; document.getElementById('btn-cancelar-edicao').classList.remove('hidden');
+            
+            document.getElementById('titulo-form-lancamento').innerText = 'Editar Lançamento'; document.getElementById('btn-cancelar-edicao').classList.remove('hidden');
             handleFormLancamento(); window.scrollTo(0,0);
         }
 
         window.excluirTx = function(id) {
-            if(currentUserRole !== 'admin') return alert("Acesso Negado.");
+            if(currentUserRole !== 'admin') return;
             const tx = transacoes.find(t => t.id === id); if(!tx) return;
-            if(confirm('Tem certeza que deseja excluir? Isso alterará os saldos permanentemente.')) {
+            if(confirm('Tem certeza? Isso alterará os saldos permanentemente.')) {
                 if(tx.tipo.startsWith('transferencia')) { const pId = tx.tipo === 'transferencia_out' ? id+1 : id-1; transacoes = transacoes.filter(t => t.id !== id && t.id !== pId); } 
                 else { transacoes = transacoes.filter(t => t.id !== id); if(tx.idContaPagar) { const cp = contasPagar.find(c => c.id === tx.idContaPagar); if(cp) cp.status = 'Pendente'; } }
-                logAuditoria('Caixa', 'Exclusão', `Lancamento excluido`, tx.valorLiquido, ''); salvarDados();
+                logAuditoria('Caixa', 'Excluiu Tx', `Val: ${tx.valorLiquido}`); salvarDados();
             }
         }
         
-        window.cancelarEdicao = function() { 
-            document.getElementById('form-lancamento').reset(); document.getElementById('edit-id').value = ''; document.getElementById('data').value = hojeStr; document.getElementById('titulo-form-lancamento').innerText = 'Registrar Lançamento'; document.getElementById('btn-cancelar-edicao').classList.add('hidden'); handleFormLancamento(); 
+        window.cancelarEdicao = function() { document.getElementById('form-lancamento').reset(); document.getElementById('edit-id').value = ''; document.getElementById('data').value = hojeStr; document.getElementById('titulo-form-lancamento').innerText = 'Registrar Lançamento'; document.getElementById('btn-cancelar-edicao').classList.add('hidden'); handleFormLancamento(); }
+
+        /* === PREVISÃO PARA REPASSE === */
+        window.abrirModalPrevisao = function(id) {
+            const p = transacoes.find(t => t.id === id); if(!p) return;
+            document.getElementById('modal-prev-id').value = id;
+            document.getElementById('modal-prev-valor').value = p.valorLiquido;
+            document.getElementById('modal-prev-data').value = hojeStr;
+            abrirModal('modal-receber-previsao');
+        }
+        window.confirmarRecebimentoPrevisao = function() {
+            if(currentUserRole !== 'admin') return;
+            const id = parseInt(document.getElementById('modal-prev-id').value);
+            const val = parseFloat(document.getElementById('modal-prev-valor').value);
+            const dt = document.getElementById('modal-prev-data').value;
+            const ct = document.getElementById('modal-prev-conta').value;
+
+            const idx = transacoes.findIndex(t => t.id === id);
+            if(idx > -1) {
+                // Transforma a previsão existente em um repasse!
+                transacoes[idx].tipo = 'repasse';
+                transacoes[idx].data = dt;
+                transacoes[idx].conta = ct;
+                transacoes[idx].valorBruto = val;
+                transacoes[idx].valorLiquido = val;
+                transacoes[idx].obs = "(Previsão Baixada) " + (transacoes[idx].obs||'');
+                salvarDados(); fecharModal('modal-receber-previsao'); alert("Repasse recebido com sucesso!");
+            }
         }
 
+        /* === HISTÓRICO CONSOLIDADO (MESES ANTIGOS) === */
+        document.getElementById('form-historico-mes').addEventListener('submit', function(e) {
+            e.preventDefault(); if(currentUserRole !== 'admin') return;
+            const m = document.getElementById('hist-mes').value; // YYYY-MM
+            let saldosFinais = {};
+            configListas.contas.forEach(c => { saldosFinais[c.id] = parseFloat(document.getElementById(`hist-saldo-${c.id}`).value || 0); });
+            saldosFinais['ifood_pendente'] = parseFloat(document.getElementById(`hist-saldo-ifood_pendente`).value || 0);
+
+            const obj = {
+                mes: m,
+                pedidos: parseInt(document.getElementById('hist-pedidos').value || 0),
+                vendaBruta: parseFloat(document.getElementById('hist-venda-bruta').value || 0),
+                taxaIfood: parseFloat(document.getElementById('hist-taxa-ifood').value || 0),
+                taxaCartao: parseFloat(document.getElementById('hist-taxa-cartao').value || 0),
+                saidas: parseFloat(document.getElementById('hist-saidas').value || 0),
+                saldos: saldosFinais
+            };
+            
+            const idx = historicoMeses.findIndex(h => h.mes === m);
+            if(idx > -1) historicoMeses[idx] = obj; else historicoMeses.push(obj);
+            
+            logAuditoria('Histórico', 'Registrado', `Mês ${m}`);
+            salvarDados(); fecharModal('modal-historico-mes'); alert("Mês histórico salvo!");
+        });
+
         /* === CONTAS A PAGAR === */
+        // (Logica inalterada, apenas IDs dinamicos)
         document.getElementById('form-cp').addEventListener('submit', function(e){
             e.preventDefault(); if(currentUserRole !== 'admin') return;
             const id = document.getElementById('cp-id').value;
             const obj = { id: id ? parseInt(id) : Date.now(), descricao: document.getElementById('cp-desc').value, valor: parseFloat(document.getElementById('cp-valor').value), vencimento: document.getElementById('cp-venc').value, categoria: document.getElementById('cp-cat').value, recorrencia: document.getElementById('cp-recorrencia').value, contaPrevista: document.getElementById('cp-conta').value, status: id ? contasPagar.find(c=>c.id==id).status : 'Pendente' };
-            if(id) { const idx = contasPagar.findIndex(c=>c.id==id); logAuditoria('Contas Pagar', 'Edição', obj.descricao, contasPagar[idx], obj); contasPagar[idx] = obj; } else { contasPagar.push(obj); logAuditoria('Contas Pagar', 'Criação', obj.descricao, '', obj.valor); }
+            if(id) { const idx = contasPagar.findIndex(c=>c.id==id); contasPagar[idx] = obj; } else { contasPagar.push(obj); }
             salvarDados(); cancelarEdicaoCP();
         });
         window.pagarCP = function(id) {
-            if(currentUserRole !== 'admin') return alert("Acesso Negado.");
+            if(currentUserRole !== 'admin') return;
             const cp = contasPagar.find(c => c.id === id); if(!cp) return;
             const dataPagto = prompt("Data do pagamento (YYYY-MM-DD):", hojeStr); if(!dataPagto) return;
             cp.status = 'Pago'; cp.dataPagamento = dataPagto;
-            transacoes.push({ id: Date.now(), tipo: 'saida', data: dataPagto, forma: 'pix', conta: cp.contaPrevista, valorBruto: cp.valor, taxa: 0, valorLiquido: cp.valor, qtdPedidos: 0, categoria: cp.categoria, obs: `PGTO: ${cp.descricao}`, idContaPagar: cp.id });
+            transacoes.push({ id: Date.now(), tipo: 'saida', data: dataPagto, forma: configListas.formas[1].id, conta: cp.contaPrevista, valorBruto: cp.valor, taxa: 0, valorLiquido: cp.valor, qtdPedidos: 0, categoria: cp.categoria, obs: `PGTO: ${cp.descricao}`, idContaPagar: cp.id });
             if(cp.recorrencia !== 'unica') {
                 const prox = new Date(cp.vencimento + 'T12:00:00'); if(cp.recorrencia === 'mensal') prox.setMonth(prox.getMonth() + 1); else if(cp.recorrencia === 'semanal') prox.setDate(prox.getDate() + 7);
                 contasPagar.push({ id: Date.now()+1, descricao: cp.descricao, valor: cp.valor, vencimento: prox.toISOString().split('T')[0], categoria: cp.categoria, recorrencia: cp.recorrencia, contaPrevista: cp.contaPrevista, status: 'Pendente' }); alert("Pagamento registrado e próxima gerada!");
             } else { alert("Pagamento salvo!"); }
-            logAuditoria('Contas Pagar', 'Pagamento', cp.descricao, '', cp.valor); salvarDados();
+            salvarDados();
         }
-        window.editarCP = function(id) { if(currentUserRole !== 'admin') return; const cp = contasPagar.find(c => c.id === id); document.getElementById('cp-id').value = cp.id; document.getElementById('cp-desc').value = cp.descricao; document.getElementById('cp-valor').value = cp.valor; document.getElementById('cp-venc').value = cp.vencimento; document.getElementById('cp-cat').value = cp.categoria; document.getElementById('cp-recorrencia').value = cp.recorrencia; document.getElementById('cp-conta').value = cp.contaPrevista || 'caixa_fisico'; document.getElementById('titulo-form-cp').innerText = "Editar Conta"; document.getElementById('cp-btn-cancelar').classList.remove('hidden'); window.scrollTo(0,0); }
-        window.excluirCP = function(id) { if(currentUserRole !== 'admin') return; if(confirm("Excluir conta?")) { contasPagar = contasPagar.filter(c => c.id !== id); logAuditoria('Contas Pagar', 'Exclusão', `ID ${id}`); salvarDados(); } }
-        window.cancelarEdicaoCP = function() { document.getElementById('form-cp').reset(); document.getElementById('cp-id').value = ''; document.getElementById('cp-venc').value = hojeStr; document.getElementById('titulo-form-cp').innerText = "Lançar Despesa"; document.getElementById('cp-btn-cancelar').classList.add('hidden'); }
+        window.editarCP = function(id) { if(currentUserRole!=='admin')return; const cp=contasPagar.find(c=>c.id===id); document.getElementById('cp-id').value=cp.id; document.getElementById('cp-desc').value=cp.descricao; document.getElementById('cp-valor').value=cp.valor; document.getElementById('cp-venc').value=cp.vencimento; document.getElementById('cp-cat').value=cp.categoria; document.getElementById('cp-recorrencia').value=cp.recorrencia; document.getElementById('cp-conta').value=cp.contaPrevista; document.getElementById('titulo-form-cp').innerText="Editar Conta"; document.getElementById('cp-btn-cancelar').classList.remove('hidden'); window.scrollTo(0,0); }
+        window.excluirCP = function(id) { if(currentUserRole!=='admin')return; if(confirm("Excluir conta?")) { contasPagar = contasPagar.filter(c => c.id !== id); salvarDados(); } }
+        window.cancelarEdicaoCP = function() { document.getElementById('form-cp').reset(); document.getElementById('cp-id').value=''; document.getElementById('cp-venc').value=hojeStr; document.getElementById('titulo-form-cp').innerText="Lançar Despesa"; document.getElementById('cp-btn-cancelar').classList.add('hidden'); }
 
-        /* === CONCILIAÇÃO MÚLTIPLA === */
-        let prevSaldosConcil = { caixa_fisico: 0, stone: 0, bau_ton: 0 };
+
+        /* === RENDERIZAÇÃO E CÁLCULOS PRINCIPAIS === */
         
+        let prevSaldosConcil = {};
+        let saldosAtuais = {};
+
+        window.atualizarTelas = function() {
+            const filtroMes = document.getElementById('dash-filtro-mes').value || mesStr;
+            
+            saldosAtuais = { 'ifood_pendente': 0 };
+            configListas.contas.forEach(c => saldosAtuais[c.id] = 0);
+            
+            let previsoesIfood = []; 
+            let statsMes = { vendasBrutas: 0, liquidaRecebida: 0, pedidos: 0, saidas: 0, taxasIfood: 0, taxasCartao: 0, catObj: {} };
+            let diasVendas = {}; // Para melhor dia
+
+            // Calcular saldos a partir de transações + histórico mais recente
+            // (Para simplificar, vamos basear o patrimônio apenas no giro das transações)
+            transacoes.forEach(t => {
+                const val = t.valorLiquido; const c = t.conta;
+                
+                // Saldo Dinâmico
+                if(saldosAtuais[c] !== undefined) {
+                    if(['venda', 'entrada', 'aporte', 'transferencia_in', 'repasse'].includes(t.tipo)) saldosAtuais[c] += val;
+                    else if(['saida', 'transferencia_out'].includes(t.tipo)) saldosAtuais[c] -= val;
+                }
+                
+                // Repasse deduz do iFood Pendente
+                if(t.tipo === 'repasse') saldosAtuais['ifood_pendente'] -= val;
+                
+                // Previsão futura e Agendamentos
+                if(t.tipo === 'previsao' && t.data >= hojeStr) previsoesIfood.push(t);
+                
+                // Filtro do Mês Selecionado (Resultados e DRE)
+                if(t.data.startsWith(filtroMes)) {
+                    if(t.tipo === 'venda') { 
+                        statsMes.vendasBrutas += t.valorBruto; 
+                        statsMes.pedidos += t.qtdPedidos; 
+                        if(t.forma === 'ifood') statsMes.taxasIfood += t.taxa;
+                        if(t.forma === 'cartao') statsMes.taxasCartao += t.taxa;
+                        
+                        // Guarda info do dia da semana (0=Dom, 6=Sab)
+                        const d = new Date(t.data).getDay();
+                        diasVendas[d] = (diasVendas[d] || {v:0, c:0}); diasVendas[d].v += t.valorBruto; diasVendas[d].c++;
+                    }
+                    if(t.tipo === 'saida' && !t.obs?.includes('Distribuição') && !t.obs?.includes('Restituição') && t.forma !== 'ajuste_contabil') {
+                        statsMes.saidas += val;
+                        statsMes.catObj[t.categoria || 'Outros'] = (statsMes.catObj[t.categoria || 'Outros'] || 0) + val;
+                    }
+                    // Lucro real = Todas as Entradas (Venda + Repasse) - (Saidas)
+                    if(['venda','entrada','repasse'].includes(t.tipo) && t.forma !== 'ifood') statsMes.liquidaRecebida += val; // Entrou na conta
+                }
+            });
+
+            // Atualizar UI Saldos Topo
+            const containerSaldos = document.getElementById('dash-saldos-container');
+            containerSaldos.innerHTML = '';
+            let totalDisp = 0;
+            configListas.contas.forEach(c => {
+                totalDisp += saldosAtuais[c.id];
+                containerSaldos.innerHTML += `<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 border-t-4 border-t-blue-400">
+                    <p class="text-[10px] font-semibold text-slate-500 uppercase mb-1 truncate">${c.nome}</p>
+                    <p class="text-xl font-bold text-slate-800">${formatMoney(saldosAtuais[c.id])}</p>
+                </div>`;
+            });
+            containerSaldos.innerHTML += `<div class="bg-slate-800 rounded-xl shadow-sm p-4 text-white">
+                <p class="text-[10px] font-semibold text-slate-300 uppercase mb-1">Total Disponível (Somado)</p>
+                <p class="text-xl font-bold">${formatMoney(totalDisp)}</p>
+            </div>`;
+
+            document.getElementById('dash-conta-ifood').innerText = formatMoney(saldosAtuais['ifood_pendente']);
+            
+            // Render Previsões
+            previsoesIfood.sort((a,b) => new Date(a.data) - new Date(b.data));
+            document.getElementById('dash-previsoes-ifood').innerHTML = previsoesIfood.length ? previsoesIfood.map(p => `
+                <div class="flex justify-between items-center text-[10px] py-1 border-b border-amber-100 last:border-0">
+                    <span>${formatData(p.data)}</span>
+                    <strong class="text-amber-700 mx-2">${formatMoney(p.valorLiquido)}</strong>
+                    <button onclick="abrirModalPrevisao(${p.id})" class="admin-only bg-emerald-500 text-white px-2 rounded hover:bg-emerald-600 font-bold">R$</button>
+                </div>`).join('') : '<p class="text-[10px] text-amber-500 italic">Sem agendamentos futuros</p>';
+
+            // Render Dashboard Principal (Resultados)
+            const lucroOp = statsMes.vendasBrutas - statsMes.taxasIfood - statsMes.taxasCartao - statsMes.saidas;
+            const lucroReal = statsMes.liquidaRecebida - statsMes.saidas;
+
+            document.getElementById('dash-meta-mes').innerText = formatMoney(metaMensal); document.getElementById('dash-faturado-mes').innerText = formatMoney(statsMes.vendasBrutas);
+            let pMeta = metaMensal > 0 ? Math.min((statsMes.vendasBrutas / metaMensal) * 100, 100) : 0;
+            document.getElementById('dash-progresso-txt').innerText = pMeta.toFixed(1) + '%'; document.getElementById('dash-progresso-barra').style.width = pMeta + '%';
+            
+            document.getElementById('dash-lucro-real').innerText = formatMoney(lucroReal); 
+            document.getElementById('dash-lucro-op').innerText = formatMoney(lucroOp); document.getElementById('dash-lucro-op').className = `text-lg font-bold ${lucroOp >= 0 ? 'text-blue-600' : 'text-rose-600'}`;
+            document.getElementById('dash-saidas-mes').innerText = formatMoney(statsMes.saidas);
+            document.getElementById('dash-taxas-mes').innerText = formatMoney(statsMes.taxasIfood + statsMes.taxasCartao);
+            document.getElementById('dash-ticket').innerText = formatMoney(statsMes.pedidos>0 ? statsMes.vendasBrutas/statsMes.pedidos : 0); document.getElementById('dash-pedidos').innerText = statsMes.pedidos;
+
+            // Melhor Dia
+            const nomesDias = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+            let bestDay = -1; let bestAvg = 0;
+            for(let d in diasVendas) { let avg = diasVendas[d].v / diasVendas[d].c; if(avg > bestAvg) { bestAvg = avg; bestDay = d; } }
+            document.getElementById('dash-melhor-dia').innerText = bestDay >= 0 ? nomesDias[bestDay] : "N/A";
+            document.getElementById('dash-melhor-dia-val').innerText = bestDay >= 0 ? `${formatMoney(bestAvg)} méd/dia` : "-";
+
+            // Categorias Resumo
+            const ccDash = document.getElementById('dash-categorias-resumo'); ccDash.innerHTML = '';
+            Object.keys(statsMes.catObj).map(k=>({n:k,v:statsMes.catObj[k]})).sort((a,b)=>b.v-a.v).slice(0,5).forEach(c=>{ 
+                let p = statsMes.saidas > 0 ? ((c.v/statsMes.saidas)*100).toFixed(0) : 0;
+                ccDash.innerHTML += `<div class="flex justify-between text-[10px] items-center"><span>${c.n}</span><strong class="text-rose-600">${formatMoney(c.v)} <span class="text-slate-400 font-normal">(${p}%)</span></strong></div>`; 
+            });
+
+            renderHistoricalCards();
+            
+            // Histórico Transações Aba "Lançamentos"
+            const tbHist = document.getElementById('table-historico'); tbHist.innerHTML = '';
+            [...transacoes].sort((a,b) => b.id - a.id).slice(0, 50).forEach(t => { 
+                let d = t.obs||'-'; if(t.tipo==='aporte')d=`Aporte`; else if(t.tipo==='saida'||t.tipo==='entrada')d=`[${t.categoria||'Outros'}] ${d}`;
+                let sinal = (['venda','entrada','aporte','transferencia_in','repasse'].includes(t.tipo)) ? '+' : (t.tipo==='previsao'?'':'-');
+                let corVal = sinal === '+' ? 'text-emerald-600' : (t.tipo==='previsao' ? 'text-amber-500' : 'text-rose-600');
+                tbHist.innerHTML += `<tr><td class="px-4 py-2 text-xs">${formatData(t.data)}</td><td class="px-4 py-2"><span class="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold uppercase">${t.tipo.replace('_in','').replace('_out','')}</span></td><td class="px-4 py-2 text-[10px] font-semibold text-slate-600 uppercase">${getNomeConta(t.conta)}</td><td class="px-4 py-2 text-xs truncate max-w-[150px]" title="${d}">${d}</td><td class="px-4 py-2 text-right font-medium text-sm ${corVal}">${sinal} ${formatMoney(t.valorLiquido)}</td><td class="px-4 py-2 text-right text-xs admin-only"><button onclick="editarTx(${t.id})" class="text-blue-600 mr-2 hover:underline">Editar</button><button onclick="excluirTx(${t.id})" class="text-rose-600 hover:underline">Excluir</button></td></tr>`;
+            });
+
+            renderContasPagar();
+            renderPaineisSaldosHistoricoModal(); // Para o modal do mês
+            // atualizarTelasSocios();
+        }
+
+        function renderHistoricalCards() {
+            // Pega meses dos ultimos 12 meses (dinâmicos + históricos)
+            let masterMap = {};
+            // Popula com histórico estático
+            historicoMeses.forEach(h => masterMap[h.mes] = { b: h.vendaBruta, s: h.saidas, l: (h.vendaBruta - h.saidas - h.taxaIfood - h.taxaCartao) });
+            // Sobrescreve/Popula com transações reais
+            transacoes.forEach(t => {
+                const m = t.data.substring(0,7);
+                if(!masterMap[m]) masterMap[m] = { b:0, s:0, l:0 };
+                if(t.tipo === 'venda') { masterMap[m].b += t.valorBruto; masterMap[m].l += t.valorBruto - t.taxa; }
+                if(t.tipo === 'saida' && t.forma !== 'ajuste_contabil') { masterMap[m].s += t.valorLiquido; masterMap[m].l -= t.valorLiquido; }
+            });
+
+            const cont = document.getElementById('dash-historico-meses'); cont.innerHTML = '';
+            Object.keys(masterMap).sort().reverse().slice(0, 12).forEach(m => {
+                const data = masterMap[m];
+                cont.innerHTML += `<div class="min-w-[180px] bg-slate-50 border border-slate-200 rounded-lg p-3 shrink-0">
+                    <p class="font-bold text-sm text-slate-700 border-b pb-1 mb-2">${m.split('-').reverse().join('/')}</p>
+                    <div class="flex justify-between text-[10px] mb-1"><span>Bruto:</span> <strong class="text-slate-800">${formatMoney(data.b)}</strong></div>
+                    <div class="flex justify-between text-[10px] mb-1"><span>Saídas:</span> <strong class="text-rose-600">${formatMoney(data.s)}</strong></div>
+                    <div class="flex justify-between text-[10px] border-t pt-1 mt-1"><span>L. Operac:</span> <strong class="${data.l>=0?'text-emerald-600':'text-rose-600'}">${formatMoney(data.l)}</strong></div>
+                </div>`;
+            });
+        }
+
+        function renderContasPagar() {
+            const tbCP = document.getElementById('table-contas-pagar'); tbCP.innerHTML = ''; const tbCPPagas = document.getElementById('table-cp-pagas'); tbCPPagas.innerHTML = '';
+            let cpAtraso=0, cpHoje=0;
+            [...contasPagar].sort((a,b) => new Date(a.vencimento) - new Date(b.vencimento)).forEach(c => {
+                if(c.status === 'Pago') { tbCPPagas.innerHTML += `<tr><td class="px-4 py-2 text-xs"><span class="line-through text-slate-400">${formatData(c.vencimento)}</span><br><span class="text-[9px] text-emerald-600">Pago: ${formatData(c.dataPagamento)}</span></td><td class="px-4 py-2 text-xs">${c.descricao}</td><td class="px-4 py-2 text-right text-xs font-medium">${formatMoney(c.valor)}</td></tr>`; } 
+                else {
+                    let badgeStatus = '';
+                    if(c.vencimento < hojeStr) { badgeStatus = '<span class="bg-rose-100 text-rose-700 px-2 rounded text-[10px]">Atrasada</span>'; cpAtraso++; } 
+                    else if(c.vencimento === hojeStr) { badgeStatus = '<span class="bg-amber-100 text-amber-700 px-2 rounded text-[10px]">Hoje</span>'; cpHoje++; } 
+                    else badgeStatus = '<span class="bg-blue-100 text-blue-700 px-2 rounded text-[10px]">Prazo</span>';
+                    tbCP.innerHTML += `<tr><td class="px-4 py-2 text-xs font-medium">${formatData(c.vencimento)}</td><td class="px-4 py-2"><p class="text-sm font-medium text-slate-800">${c.descricao}</p><p class="text-[9px] text-slate-400 uppercase">${c.categoria} | ${getNomeConta(c.contaPrevista)}</p></td><td class="px-4 py-2 text-right font-bold text-rose-600">${formatMoney(c.valor)}</td><td class="px-4 py-2 text-center">${badgeStatus}</td><td class="px-4 py-2 text-right text-xs admin-only"><button onclick="pagarCP(${c.id})" class="text-emerald-600 font-bold border border-emerald-200 px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 mr-2 shadow-sm">PAGAR</button> <button onclick="editarCP(${c.id})" class="text-slate-500 hover:text-blue-600 mr-2">✏️</button><button onclick="excluirCP(${c.id})" class="text-slate-400 hover:text-rose-600">🗑️</button></td></tr>`;
+                }
+            });
+            if(cpAtraso > 0) document.getElementById('badge-atrasadas').classList.remove('hidden'); else document.getElementById('badge-atrasadas').classList.add('hidden');
+        }
+
+        /* === CONCILIAÇÃO DINÂMICA === */
         window.calcularPreviaFechamento = function() {
             const dStr = document.getElementById('fechamento-data').value;
-            ['caixa', 'stone', 'bau'].forEach(c => { document.getElementById(`concil-val-${c}`).value = ''; document.getElementById(`concil-dif-${c}`).classList.add('hidden'); });
-
-            prevSaldosConcil = { caixa_fisico: 0, stone: 0, bau_ton: 0 };
+            prevSaldosConcil = {}; configListas.contas.forEach(c => prevSaldosConcil[c.id] = 0);
+            
             transacoes.forEach(t => {
                 if(t.data <= dStr && t.conta && prevSaldosConcil[t.conta] !== undefined) {
                     if (['venda', 'entrada', 'aporte', 'transferencia_in', 'repasse'].includes(t.tipo)) prevSaldosConcil[t.conta] += t.valorLiquido;
                     if (['saida', 'transferencia_out'].includes(t.tipo)) prevSaldosConcil[t.conta] -= t.valorLiquido;
                 }
             });
-            document.getElementById('concil-esp-caixa').innerText = formatMoney(prevSaldosConcil.caixa_fisico);
-            document.getElementById('concil-esp-stone').innerText = formatMoney(prevSaldosConcil.stone);
-            document.getElementById('concil-esp-bau').innerText = formatMoney(prevSaldosConcil.bau_ton);
+            
+            // Atualiza UI
+            configListas.contas.forEach(c => {
+                const el = document.getElementById(`concil-esp-${c.id}`); if(el) el.innerText = formatMoney(prevSaldosConcil[c.id]);
+                const valEl = document.getElementById(`concil-val-${c.id}`); if(valEl) valEl.value = '';
+                const diffEl = document.getElementById(`concil-dif-${c.id}`); if(diffEl) diffEl.classList.add('hidden');
+            });
         }
 
-        window.calcularDif = function(key) {
-            const keyMap = { 'caixa': 'caixa_fisico', 'stone': 'stone', 'bau': 'bau_ton' };
-            const input = document.getElementById(`concil-val-${key}`).value;
-            const diffEl = document.getElementById(`concil-dif-${key}`);
-            
-            if(input === '') { diffEl.classList.add('hidden'); return; }
-            const contado = parseFloat(input);
-            const esp = prevSaldosConcil[keyMap[key]];
-            const diff = contado - esp;
+        function renderPaineisConciliacao() {
+            const container = document.getElementById('container-conciliacao-paineis');
+            container.innerHTML = '';
+            configListas.contas.forEach(c => {
+                container.innerHTML += `
+                <div class="bg-slate-800 rounded-xl p-5 text-white shadow relative overflow-hidden">
+                    <h3 class="text-sm font-bold uppercase mb-4 text-slate-300 truncate" title="${c.nome}">${c.nome}</h3>
+                    <p class="text-[10px] text-slate-400">Saldo Esperado (Sistema)</p>
+                    <p class="text-2xl font-bold text-blue-300 mb-4" id="concil-esp-${c.id}">R$ 0,00</p>
+                    <div class="admin-only">
+                        <label class="block text-[10px] uppercase text-slate-400 mb-1">Valor Contado/Real App:</label>
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-lg font-bold text-slate-500">R$</span>
+                            <input type="number" id="concil-val-${c.id}" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-lg font-bold text-white outline-none focus:border-blue-400 transition" step="0.01" oninput="calcularDif('${c.id}')">
+                        </div>
+                        <div class="h-6"><p id="concil-dif-${c.id}" class="text-xs font-bold px-2 py-0.5 rounded hidden w-fit"></p></div>
+                    </div>
+                </div>`;
+            });
+            calcularPreviaFechamento();
+        }
 
+        window.calcularDif = function(idConta) {
+            const input = document.getElementById(`concil-val-${idConta}`).value;
+            const diffEl = document.getElementById(`concil-dif-${idConta}`);
+            if(input === '') { diffEl.classList.add('hidden'); return; }
+            const diff = parseFloat(input) - prevSaldosConcil[idConta];
             diffEl.classList.remove('hidden');
-            if(diff === 0) { diffEl.innerText = "Bateu (R$ 0,00)"; diffEl.className = "text-xs font-bold px-2 py-0.5 rounded w-fit bg-emerald-500/20 text-emerald-300"; }
+            if(Math.abs(diff) < 0.01) { diffEl.innerText = "Bateu (R$ 0,00)"; diffEl.className = "text-xs font-bold px-2 py-0.5 rounded w-fit bg-emerald-500/20 text-emerald-300"; }
             else if(diff > 0) { diffEl.innerText = `Sobra: +${formatMoney(diff)}`; diffEl.className = "text-xs font-bold px-2 py-0.5 rounded w-fit bg-blue-500/20 text-blue-300"; }
             else { diffEl.innerText = `Quebra: ${formatMoney(diff)}`; diffEl.className = "text-xs font-bold px-2 py-0.5 rounded w-fit bg-rose-500/20 text-rose-300"; }
         }
 
         window.executarConciliacao = function() {
-            if(currentUserRole !== 'admin') return alert("Acesso Negado.");
+            if(currentUserRole !== 'admin') return;
             const dataStr = document.getElementById('fechamento-data').value;
-            const contasArr = [{key:'caixa', db:'caixa_fisico', f:'dinheiro'}, {key:'stone', db:'stone', f:'pix'}, {key:'bau', db:'bau_ton', f:'pix'}];
-            
             let ajustados = 0; let detalhesMsg = [];
 
-            contasArr.forEach((c, idx) => {
-                const input = document.getElementById(`concil-val-${c.key}`).value;
+            configListas.contas.forEach((c, idx) => {
+                const input = document.getElementById(`concil-val-${c.id}`).value;
                 if(input !== '') {
-                    const diff = parseFloat(input) - prevSaldosConcil[c.db];
+                    const diff = parseFloat(input) - prevSaldosConcil[c.id];
                     if(Math.abs(diff) > 0.01) {
                         const isSobra = diff > 0;
                         transacoes.push({
-                            id: Date.now() + idx, tipo: isSobra ? 'entrada' : 'saida', data: dataStr, conta: c.db, forma: c.f,
+                            id: Date.now() + idx, tipo: isSobra ? 'entrada' : 'saida', data: dataStr, conta: c.id, forma: 'ajuste_contabil',
                             valorBruto: Math.abs(diff), taxa: 0, valorLiquido: Math.abs(diff),
-                            categoria: 'Divergência / Ajuste', obs: `${isSobra ? 'Sobra' : 'Quebra'} Conciliação (${NOMES_CONTAS[c.db]})`
+                            categoria: 'Outros', obs: `[Ajuste Conciliação] ${isSobra ? 'Sobra' : 'Quebra'}`
                         });
-                        ajustados++; detalhesMsg.push(`${NOMES_CONTAS[c.db]}: Ajuste de ${formatMoney(diff)}`);
+                        ajustados++; detalhesMsg.push(`${c.nome}: Ajuste ${formatMoney(diff)}`);
                     }
                 }
             });
 
             if(ajustados > 0) {
                 fechamentos.push({ id: Date.now(), dataRegistro: hojeStr, dataBase: dataStr, msg: detalhesMsg.join(" | ") });
-                logAuditoria('Conciliação', 'Ajuste de Saldo', `Ajustadas ${ajustados} contas na data ${dataStr}`);
-                salvarDados(); calcularPreviaFechamento();
-                alert(`Conciliação salva na nuvem! Foram gerados ${ajustados} ajustes.\nPara corrigir a causa da quebra depois, vá em 'Relatórios', ache a movimentação e clique em Editar!`);
-            } else { alert("Nenhuma divergência para ajustar."); }
+                logAuditoria('Conciliação', 'Fechamento', `Gerou ${ajustados} ajustes`);
+                salvarDados(); calcularPreviaFechamento(); alert(`Conciliação salva! Gerados ${ajustados} ajustes.`);
+            } else { alert("Nenhuma divergência registrada."); }
         }
 
-        /* === SISTEMA GERAL DE RENDERIZAÇÃO === */
-        window.atualizarTelas = function() {
-            const filtroMes = document.getElementById('dash-filtro-mes').value || mesStr;
-            const [anoFil, mesFil] = filtroMes.split('-');
+        function renderPaineisSaldosHistoricoModal() {
+            const c = document.getElementById('container-hist-saldos');
+            if(!c) return;
+            c.innerHTML = `<div><label class="block text-[10px] font-bold mb-1">iFood Pendente</label><input type="number" id="hist-saldo-ifood_pendente" class="w-full border rounded px-2 py-1 text-sm" step="0.01"></div>`;
+            configListas.contas.forEach(conta => {
+                c.innerHTML += `<div><label class="block text-[10px] font-bold mb-1 truncate">${conta.nome}</label><input type="number" id="hist-saldo-${conta.id}" class="w-full border rounded px-2 py-1 text-sm" step="0.01"></div>`;
+            });
+        }
+
+
+        /* === BACKUP E IMPORTAÇÕES === */
+        window.exportarBackup = function() {
+            if(currentUserRole !== 'admin') return;
+            const str = JSON.stringify({ transacoes, sociosBase, pagamentosSocios, metaMensal, contasPagar, fechamentos, auditoria, historicoMeses, configListas });
+            const a = document.createElement('a'); a.href = 'data:application/json;charset=utf-8,'+ encodeURIComponent(str);
+            a.download = `V6.3_CloudBackup_${hojeStr}.json`; a.click(); logAuditoria('Sistema', 'Backup Gerado', 'Local');
+        }
+        
+        window.importarBackup = function() {
+            if(currentUserRole !== 'admin') return;
+            const f = document.getElementById('file-import').files[0]; if(!f) return alert('Selecione um arquivo .json.'); 
+            const r = new FileReader(); r.onload = function(e) {
+                try {
+                    const obj = JSON.parse(e.target.result);
+                    if(obj.transacoes) { 
+                        transacoes=obj.transacoes; historicoMeses=obj.historicoMeses||[]; configListas=obj.configListas||configListas;
+                        salvarDados(true); init(); alert('Backup Restaurado!'); location.reload();
+                    }
+                } catch(err) { alert('Erro no arquivo JSON.'); }
+            }; r.readAsText(f);
+        }
+
+        // NOVO: Importar CSV (Planilhas de Excel)
+        window.importarCSV = function() {
+            if(currentUserRole !== 'admin') return;
+            const f = document.getElementById('file-import-csv').files[0]; 
+            if(!f) return alert('Selecione um arquivo de planilha .csv.'); 
             
-            let saldos = { 'caixa_fisico': 0, 'stone': 0, 'bau_ton': 0, 'ifood_pendente': 0 };
-            let previsoesIfood = []; let mes_vendas = 0, mes_pedidos = 0, mes_saidas = 0;
-            
-            transacoes.forEach(t => {
-                const val = t.valorLiquido; const c = t.conta;
-                if(saldos[c] !== undefined) {
-                    if(['venda', 'entrada', 'aporte', 'transferencia_in', 'repasse'].includes(t.tipo)) saldos[c] += val;
-                    else if(['saida', 'transferencia_out'].includes(t.tipo)) saldos[c] -= val;
+            const reader = new FileReader(); 
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const lines = text.split(/\r?\n/);
+                    let startIndex = -1;
+
+                    // Encontra a linha de cabeçalho da tabela CSV
+                    for(let i=0; i<lines.length; i++) {
+                        const linhaLower = lines[i].toLowerCase();
+                        if(linhaLower.includes('data,opera') && linhaLower.includes('conta')) {
+                            startIndex = i + 1;
+                            break;
+                        }
+                    }
+
+                    if(startIndex === -1) return alert("Erro: Não encontrei o cabeçalho 'Data,Operação,Conta...' na planilha.");
+
+                    let importadas = 0;
+                    let idBase = Date.now();
+                    
+                    // Parseia monetário do CSV (" R$ 1.619,25 " -> 1619.25)
+                    const parseMoney = (val) => {
+                        if(!val) return 0;
+                        let s = val.replace(/[^\d,-]/g, '').replace(',', '.');
+                        return parseFloat(s) || 0;
+                    };
+                    
+                    const mapaContas = { 'caixa': 'caixa_fisico', 'stone': 'stone', 'ifood': 'ifood_pendente' };
+                    
+                    // Parseia uma linha CSV ignorando as virgulas dentro de strings
+                    const parseCsvLine = (text) => {
+                        let ret = [], inQuote = false, value = '';
+                        for (let i = 0; i < text.length; i++) {
+                            let c = text[i];
+                            if (inQuote) {
+                                if (c === '"') { if (text[i + 1] === '"') { value += '"'; i++; } else { inQuote = false; } }
+                                else { value += c; }
+                            } else {
+                                if (c === '"') inQuote = true;
+                                else if (c === ',') { ret.push(value.trim()); value = ''; }
+                                else value += c;
+                            }
+                        }
+                        ret.push(value.trim());
+                        return ret;
+                    };
+
+                    for(let i=startIndex; i<lines.length; i++) {
+                        const row = parseCsvLine(lines[i]);
+                        if(row.length < 10 || !row[0]) continue; // Pula linhas vazias
+                        
+                        const dataParts = row[0].split('/');
+                        if(dataParts.length !== 3) continue; // Pula se data não for válida
+                        const dataStr = `${dataParts[2]}-${dataParts[1]}-${dataParts[0]}`; // Converte DD/MM/YYYY para YYYY-MM-DD
+                        
+                        let tipo = row[1].toLowerCase().trim();
+                        let contaOriginal = row[2].toLowerCase().trim();
+                        let conta = mapaContas[contaOriginal] || contaOriginal;
+                        let categoria = row[3].trim();
+                        let obs = row[4].trim();
+                        let qtd = parseInt(row[5]) || 0;
+                        let forma = row[6].toLowerCase().trim();
+                        
+                        // Tratamentos básicos de padronização
+                        if(forma === 'cartão') forma = 'cartao';
+                        if(forma === '') forma = 'outros';
+                        
+                        const bruto = parseMoney(row[7]);
+                        const taxa = parseMoney(row[8]);
+                        const liquido = parseMoney(row[9]);
+
+                        let idSocio = null;
+                        if(tipo === 'aporte') {
+                            const socioMatch = sociosBase.find(s => s.nome.toLowerCase() === obs.toLowerCase());
+                            if(socioMatch) idSocio = socioMatch.id;
+                        }
+
+                        // Adiciona categoria automaticamente se for nova e for uma saída
+                        if(categoria && tipo === 'saida') {
+                            const catMatch = configListas.categorias.find(c => c.toLowerCase() === categoria.toLowerCase());
+                            if(!catMatch) configListas.categorias.push(categoria);
+                            else categoria = catMatch; // Mantem com letras maiúsculas/minúsculas da base
+                        }
+
+                        transacoes.push({
+                            id: idBase++,
+                            tipo,
+                            data: dataStr,
+                            forma,
+                            conta,
+                            valorBruto: bruto,
+                            taxa: taxa,
+                            valorLiquido: liquido,
+                            qtdPedidos: qtd,
+                            categoria: tipo === 'saida' ? categoria : '',
+                            obs,
+                            idSocioAporte: idSocio
+                        });
+                        importadas++;
+                    }
+
+                    if(importadas > 0) {
+                        logAuditoria('Sistema', 'Importar CSV', `Importadas ${importadas} transações.`);
+                        salvarDados(true);
+                        init();
+                        alert(`Sucesso! ${importadas} transações foram lidas da planilha e integradas ao sistema.`);
+                        document.getElementById('file-import-csv').value = '';
+                    } else {
+                        alert("Aviso: Nenhuma transação válida encontrada. Verifique se as colunas estão corretas.");
+                    }
+
+                } catch(err) {
+                    alert('Erro inesperado ao tentar ler a planilha: ' + err.message);
                 }
-                if(t.tipo === 'previsao' && t.data >= hojeStr) previsoesIfood.push(t);
-                if(t.data.startsWith(filtroMes)) {
-                    if(t.tipo === 'venda') { mes_vendas += t.valorBruto; mes_pedidos += t.qtdPedidos; }
-                    if(t.tipo === 'saida' && !t.obs?.includes('Distribuição') && !t.obs?.includes('Restituição') && t.categoria !== 'Divergência / Ajuste') mes_saidas += val;
-                }
-            });
+            }; 
+            // Lê o CSV em ISO-8859-1 para não bugar a acentuação brasileira exportada do Excel
+            reader.readAsText(f, 'ISO-8859-1'); 
+        };
 
-            document.getElementById('dash-conta-caixa').innerText = formatMoney(saldos.caixa_fisico);
-            document.getElementById('dash-conta-stone').innerText = formatMoney(saldos.stone);
-            document.getElementById('dash-conta-bau').innerText = formatMoney(saldos.bau_ton);
-            document.getElementById('dash-conta-ifood').innerText = formatMoney(saldos.ifood_pendente);
-            document.getElementById('dash-conta-total').innerText = formatMoney(saldos.caixa_fisico + saldos.stone + saldos.bau_ton);
-
-            previsoesIfood.sort((a,b) => new Date(a.data) - new Date(b.data));
-            document.getElementById('dash-previsoes-ifood').innerHTML = previsoesIfood.length ? previsoesIfood.map(p => `<div class="flex justify-end gap-2 text-[10px] py-0.5 border-b border-amber-100 last:border-0"><span class="text-amber-800">${formatData(p.data)}</span><strong class="text-amber-600">${formatMoney(p.valorLiquido)}</strong></div>`).join('') : '<p class="text-[10px] text-amber-500 italic">Sem agendamentos futuros</p>';
-
-            const lucroReal = mes_vendas - mes_saidas;
-
-            document.getElementById('dash-meta-mes').innerText = formatMoney(metaMensal); document.getElementById('dash-faturado-mes').innerText = formatMoney(mes_vendas);
-            let pMeta = metaMensal > 0 ? Math.min((mes_vendas / metaMensal) * 100, 100) : 0;
-            document.getElementById('dash-progresso-txt').innerText = pMeta.toFixed(1) + '%'; document.getElementById('dash-progresso-barra').style.width = pMeta + '%';
-            document.getElementById('dash-lucro-mes').innerText = formatMoney(lucroReal); document.getElementById('dash-lucro-mes').className = `text-lg font-bold ${lucroReal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
-            document.getElementById('dash-ticket').innerText = formatMoney(mes_pedidos>0 ? mes_vendas/mes_pedidos : 0); document.getElementById('dash-pedidos').innerText = mes_pedidos;
-
-            let cpAtraso=0, cpHoje=0, cp7d=0; const em7d = new Date(hojeStr); em7d.setDate(em7d.getDate() + 7);
-            contasPagar.filter(c=>c.status==='Pendente').forEach(c => { const venc = new Date(c.vencimento); if(c.vencimento < hojeStr) cpAtraso++; else if(c.vencimento === hojeStr) cpHoje++; else if(venc <= em7d) cp7d++; });
-            document.getElementById('dash-cp-atrasadas').innerText = cpAtraso; document.getElementById('dash-cp-hoje').innerText = cpHoje; document.getElementById('dash-cp-7d').innerText = cp7d;
-            if(cpAtraso > 0) document.getElementById('badge-atrasadas').classList.remove('hidden'); else document.getElementById('badge-atrasadas').classList.add('hidden');
-
-            renderCalendar(anoFil, mesFil);
-
-            const tbHist = document.getElementById('table-historico'); tbHist.innerHTML = '';
-            [...transacoes].sort((a,b) => b.id - a.id).slice(0, 40).forEach(t => { 
-                let d = t.obs||'-'; if(t.tipo==='aporte')d=`Aporte`; else if(t.tipo==='saida'||t.tipo==='entrada')d=`[${t.categoria||'Outros'}] ${d}`;
-                let sinal = (['venda','entrada','aporte','transferencia_in','repasse'].includes(t.tipo)) ? '+' : (t.tipo==='previsao'?'':'-');
-                let corVal = sinal === '+' ? 'text-emerald-600' : (t.tipo==='previsao' ? 'text-amber-500' : 'text-rose-600');
-                tbHist.innerHTML += `<tr><td class="px-4 py-2 text-xs">${formatData(t.data)}</td><td class="px-4 py-2"><span class="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold uppercase">${t.tipo.replace('_in','').replace('_out','')}</span></td><td class="px-4 py-2 text-[10px] font-semibold text-slate-600 uppercase">${NOMES_CONTAS[t.conta]||t.conta}</td><td class="px-4 py-2 text-xs truncate max-w-[150px]" title="${d}">${d}</td><td class="px-4 py-2 text-right font-medium text-sm ${corVal}">${sinal} ${formatMoney(t.valorLiquido)}</td><td class="px-4 py-2 text-right text-xs admin-only"><button onclick="editarTx(${t.id})" class="text-blue-600 mr-2 hover:underline">Editar</button><button onclick="excluirTx(${t.id})" class="text-rose-600 hover:underline">Excluir</button></td></tr>`;
-            });
-
-            const tbCP = document.getElementById('table-contas-pagar'); tbCP.innerHTML = ''; const tbCPPagas = document.getElementById('table-cp-pagas'); tbCPPagas.innerHTML = '';
-            [...contasPagar].sort((a,b) => new Date(a.vencimento) - new Date(b.vencimento)).forEach(c => {
-                let badgeStatus = '';
-                if(c.status === 'Pago') { tbCPPagas.innerHTML += `<tr><td class="px-4 py-2 text-xs"><span class="line-through text-slate-400">${formatData(c.vencimento)}</span><br><span class="text-[9px] text-emerald-600">Pago: ${formatData(c.dataPagamento)}</span></td><td class="px-4 py-2 text-xs">${c.descricao}</td><td class="px-4 py-2 text-right text-xs font-medium">${formatMoney(c.valor)}</td></tr>`; } 
-                else {
-                    if(c.vencimento < hojeStr) badgeStatus = '<span class="bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-[10px] font-bold">Atrasada</span>'; else if(c.vencimento === hojeStr) badgeStatus = '<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold">Vence Hoje</span>'; else badgeStatus = '<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">No Prazo</span>';
-                    tbCP.innerHTML += `<tr><td class="px-4 py-2 text-xs font-medium">${formatData(c.vencimento)}</td><td class="px-4 py-2"><p class="text-sm font-medium text-slate-800">${c.descricao}</p><p class="text-[9px] text-slate-400 uppercase">${c.categoria} | ${NOMES_CONTAS[c.contaPrevista]}</p></td><td class="px-4 py-2 text-right font-bold text-rose-600">${formatMoney(c.valor)}</td><td class="px-4 py-2 text-center">${badgeStatus}</td><td class="px-4 py-2 text-right text-xs admin-only"><button onclick="pagarCP(${c.id})" class="text-emerald-600 font-bold border border-emerald-200 px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 mr-2 shadow-sm">PAGAR</button> <button onclick="editarCP(${c.id})" class="text-slate-500 hover:text-blue-600 mr-2">✏️</button><button onclick="excluirCP(${c.id})" class="text-slate-400 hover:text-rose-600">🗑️</button></td></tr>`;
-                }
-            });
-
-            const tbFech = document.getElementById('table-fechamentos'); tbFech.innerHTML = '';
-            [...fechamentos].sort((a,b)=>b.id-a.id).forEach(f => {
-                tbFech.innerHTML += `<tr><td class="px-4 py-2 text-xs text-slate-500">${formatData(f.dataRegistro)}</td><td class="px-4 py-2 font-bold text-sm text-slate-700">${formatData(f.dataBase)}</td><td class="px-4 py-2 text-xs text-slate-600">${f.msg}</td></tr>`;
-            });
-
-            const tbAud = document.getElementById('table-auditoria'); tbAud.innerHTML = '';
-            auditoria.forEach(a => { tbAud.innerHTML += `<tr><td class="px-4 py-1 text-[10px] text-slate-500 whitespace-nowrap">${a.dataHora}</td><td class="px-4 py-1 text-[10px] uppercase font-bold text-slate-300">${a.acao}</td><td class="px-4 py-1 text-[10px]">${a.tela}</td><td class="px-4 py-1 text-[10px] truncate max-w-[200px]" title="${a.detalhes} | ${a.oldV} -> ${a.newV}">${a.detalhes} <span class="text-slate-600">(${a.oldV||'-'} &rarr; ${a.newV||'-'})</span></td></tr>`; });
-
-            atualizarTelasSocios();
-        }
-
-        /* === SÓCIOS === */
-        function atualizarTelasSocios() {
-            let mapInv = {}, mapRest = {}, mapLuc = {}; transacoes.filter(t=>t.tipo==='aporte').forEach(t=>mapInv[t.idSocioAporte]=(mapInv[t.idSocioAporte]||0)+t.valorLiquido); pagamentosSocios.forEach(p=>{ if(p.tipoPagamento==='lucro') mapLuc[p.idSocio]=(mapLuc[p.idSocio]||0)+p.valor; else mapRest[p.idSocio]=(mapRest[p.idSocio]||0)+p.valor; });
-            const totalInv = Object.values(mapInv).reduce((a,b)=>a+b, 0); const tbSoc = document.getElementById('table-socios'); tbSoc.innerHTML = '';
-            sociosBase.filter(s => exibirInativosSocio || s.ativo || mapInv[s.id] > 0).forEach(s => { if(!s.ativo && !exibirInativosSocio) return; let i = mapInv[s.id]||0, r = mapRest[s.id]||0, l = mapLuc[s.id]||0, p = totalInv>0 ? ((i/totalInv)*100).toFixed(1) : 0; let op = s.ativo ? '' : 'opacity-50', btnAcao = s.ativo ? `<button class="text-slate-400 hover:text-rose-600 ml-2 hide-print admin-only" onclick="alternarStatusSocio(${s.id})">Ocultar</button>` : `<button class="text-emerald-600 font-bold ml-2 hide-print admin-only" onclick="alternarStatusSocio(${s.id})">Reativar</button>`; tbSoc.innerHTML += `<tr class="${op}"><td class="px-4 py-2 font-medium">${s.nome}</td><td class="px-4 py-2">${formatMoney(i)}</td><td class="px-4 py-2 font-bold">${p}%</td><td class="px-4 py-2 text-emerald-600">${formatMoney(r)}</td><td class="px-4 py-2 font-bold text-blue-600 text-right">${formatMoney(l)}</td><td class="px-4 py-2 text-right text-xs admin-only"><button class="text-blue-600 hide-print" onclick="editarSocio(${s.id})">Editar</button>${btnAcao}</td></tr>`; });
-        }
-        document.getElementById('form-socio').addEventListener('submit', function(e) { e.preventDefault(); if(currentUserRole !== 'admin') return; const id = document.getElementById('edit-socio-id').value; const n = document.getElementById('socio-nome').value.trim(); if(id) { sociosBase.find(x=>x.id==id).nome = n; } else { sociosBase.push({ id: Date.now(), nome: n, ativo: true }); } salvarDados(); cancelarEdicaoSocio(); });
-        window.editarSocio = function(id) { if(currentUserRole !== 'admin') return; const s = sociosBase.find(x=>x.id===id); document.getElementById('edit-socio-id').value = s.id; document.getElementById('socio-nome').value = s.nome; document.getElementById('btn-cancelar-socio').classList.remove('hidden'); }
-        window.alternarStatusSocio = function(id) { if(currentUserRole !== 'admin') return; const s = sociosBase.find(x=>x.id===id); if(s) s.ativo = !s.ativo; salvarDados(); }
-        window.cancelarEdicaoSocio = function() { document.getElementById('form-socio').reset(); document.getElementById('edit-socio-id').value = ''; document.getElementById('btn-cancelar-socio').classList.add('hidden'); }
-        window.toggleInativos = function() { exibirInativosSocio = !exibirInativosSocio; document.getElementById('btn-toggle-inativos').innerText = exibirInativosSocio ? "Ocultar Inativos" : "Mostrar Inativos"; atualizarTelas(); }
-        document.getElementById('form-distribuicao').addEventListener('submit', function(e) { e.preventDefault(); if(currentUserRole !== 'admin') return; const tDist = document.getElementById('dist-tipo').value; const v = parseFloat(document.getElementById('dist-valor').value); const dt = document.getElementById('dist-data').value; const cOrig = document.getElementById('dist-conta').value; transacoes.push({ id: Date.now(), tipo: 'saida', data: dt, conta: cOrig, valorBruto: v, taxa: 0, valorLiquido: v, categoria: 'Outros', obs: tDist==='lucro'?'Distribuição de Lucros':'Restituição de Capital' }); const ativos = sociosBase.filter(s=>s.ativo); if(tDist === 'lucro') { const vs = v/ativos.length; ativos.forEach((s, i) => pagamentosSocios.push({ id: Date.now()+i, idSocio: s.id, data: dt, valor: vs, tipoPagamento: 'lucro' })); } else { let mapInv={}, totInv=0; transacoes.filter(t=>t.tipo==='aporte').forEach(t=>{ totInv+=t.valorLiquido; mapInv[t.idSocioAporte]=(mapInv[t.idSocioAporte]||0)+t.valorLiquido; }); ativos.forEach((s, i) => { if((mapInv[s.id]||0)>0) pagamentosSocios.push({ id: Date.now()+i, idSocio: s.id, data: dt, valor: v*(mapInv[s.id]/totInv), tipoPagamento: 'restituicao' }); }); } salvarDados(); this.reset(); alert('Distribuição registrada na nuvem!'); });
-        function popularSelectSocios() { const sel = document.getElementById('socio-aporte'); if(!sel) return; const val = sel.value; sel.innerHTML = '<option value="">Selecione o Sócio...</option>'; sociosBase.filter(s => s.ativo).forEach(s => sel.innerHTML += `<option value="${s.id}">${s.nome}</option>`); sel.value = val; }
-
-        /* === DRE COMPLETO E EXTRATO === */
+        // Relatório DRE (Mantido similar, adaptando configs dinamicas)
         window.gerarRelatorio = function() {
             const mBase = document.getElementById('rel-mes').value; if(!mBase) return;
-            let rV=0, rS=0, rCR=0, rVI=0, rTI=0, rR=0, cat={};
+            let rV=0, rS=0, rCR=0, rVI=0, rTI=0, rR=0, rTC=0, cat={};
             const tbodyExtrato = document.getElementById('table-relatorio'); tbodyExtrato.innerHTML = '';
             const txsMes = transacoes.filter(t=>t.data.startsWith(mBase)).sort((a,b) => new Date(a.data) - new Date(b.data));
 
             txsMes.forEach(t=>{
                 let rendered = false; let corVal = 'text-slate-600', sinal = ''; let detalhes = t.obs || '-';
 
-                if(t.tipo==='venda'){ rV+=t.valorBruto; if(t.forma==='ifood'){rVI+=t.valorBruto; rTI+=t.taxa; detalhes = `Taxa iFood ${formatMoney(t.taxa)} | `+detalhes;} else rCR+=t.valorLiquido; rendered = true; sinal = '+'; corVal = 'text-emerald-600'; }
+                if(t.tipo==='venda'){ 
+                    rV+=t.valorBruto; 
+                    if(t.forma==='ifood'){ rVI+=t.valorBruto; rTI+=t.taxa; } 
+                    else if(t.forma==='cartao'){ rTC+=t.taxa; rCR+=t.valorLiquido; }
+                    else { rCR+=t.valorLiquido; }
+                    if(t.taxa > 0) detalhes = `Taxa Descontada ${formatMoney(t.taxa)} | `+detalhes;
+                    rendered = true; sinal = '+'; corVal = 'text-emerald-600'; 
+                }
                 else if(t.tipo==='saida' && !t.tipo.startsWith('transf')){ 
                     rS+=t.valorLiquido; rCR-=t.valorLiquido; cat[t.categoria||'Outros']=(cat[t.categoria||'Outros']||0)+t.valorLiquido; 
                     detalhes = `[${t.categoria}] ` + detalhes; rendered = true; sinal = '-'; corVal = 'text-rose-600';
                 }
                 else if(t.tipo==='repasse'){ rR+=t.valorLiquido; rCR+=t.valorLiquido; rendered = true; sinal = '+'; corVal = 'text-emerald-600'; }
-                else if(t.tipo==='entrada'||t.tipo==='aporte'){ rCR+=t.valorLiquido; detalhes = `[${t.categoria||'Outros'}] ` + detalhes; rendered = true; sinal = '+'; corVal = 'text-emerald-600'; }
+                else if(t.tipo==='entrada'||t.tipo==='aporte'||t.tipo==='ajuste'){ rCR+=t.valorLiquido; detalhes = `[${t.categoria||'Outros'}] ` + detalhes; rendered = true; sinal = (t.tipo==='ajuste'&&t.forma==='saida')?'-':'+'; corVal = sinal==='+'?'text-emerald-600':'text-rose-600'; }
 
                 if(rendered) {
                     tbodyExtrato.innerHTML += `<tr>
                         <td class="px-4 py-2 text-xs">${formatData(t.data)}</td>
                         <td class="px-4 py-2"><span class="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold uppercase">${t.tipo}</span></td>
-                        <td class="px-4 py-2 text-[10px] font-semibold text-slate-600 uppercase">${NOMES_CONTAS[t.conta]||t.conta}</td>
-                        <td class="px-4 py-2 text-xs">${detalhes}</td>
+                        <td class="px-4 py-2 text-[10px] font-semibold text-slate-600 uppercase">${getNomeConta(t.conta)}</td>
                         <td class="px-4 py-2 text-right font-medium text-sm ${corVal}">${sinal} ${formatMoney(t.valorLiquido)}</td>
-                        <td class="px-4 py-2 text-right text-xs hide-print admin-only">
-                            <button onclick="editarTx(${t.id})" class="text-blue-600 mr-2 hover:underline">Editar</button>
-                            <button onclick="excluirTx(${t.id})" class="text-rose-600 hover:underline">Excluir</button>
-                        </td>
                     </tr>`;
                 }
             });
 
-            document.getElementById('rel-vendas').innerText = formatMoney(rV); document.getElementById('rel-saidas').innerText = formatMoney(rS); document.getElementById('rel-caixa-real').innerText = formatMoney(rCR);
-            document.getElementById('rel-txt-venda-ifood').innerText = formatMoney(rVI); document.getElementById('rel-txt-taxas-ifood').innerText = formatMoney(rTI); document.getElementById('rel-txt-repasse').innerText = formatMoney(rR);
+            document.getElementById('rel-vendas').innerText = formatMoney(rV); 
+            document.getElementById('rel-taxas').innerText = formatMoney(rTI + rTC);
+            document.getElementById('rel-saidas').innerText = formatMoney(rS); 
+            document.getElementById('rel-caixa-real').innerText = formatMoney(rCR);
+            document.getElementById('rel-txt-venda-ifood').innerText = formatMoney(rVI); 
+            document.getElementById('rel-txt-taxas-ifood').innerText = formatMoney(rTI); 
+            document.getElementById('rel-txt-repasse').innerText = formatMoney(rR);
             const cc = document.getElementById('rel-categorias'); cc.innerHTML = '';
             Object.keys(cat).map(k=>({n:k,v:cat[k]})).sort((a,b)=>b.v-a.v).forEach(c=>{ let p=((c.v/rS)*100).toFixed(1); cc.innerHTML += `<div class="mb-2"><div class="flex justify-between text-xs mb-1"><span>${c.n}</span><strong>${formatMoney(c.v)} (${p}%)</strong></div><div class="w-full bg-slate-100 rounded-full h-1"><div class="bg-rose-400 h-1 rounded-full" style="width:${p}%"></div></div></div>`; });
             document.getElementById('rel-resultados').classList.remove('hidden');
         }
-
-        function renderCalendar(anoStr, mesStr) {
-            const ano = parseInt(anoStr), mes = parseInt(mesStr)-1, dias = new Date(ano, mes+1, 0).getDate();
-            const cal = document.getElementById('dash-calendar'); cal.innerHTML = '';
-            let vDia = {}; transacoes.filter(t=>t.tipo==='venda'&&t.data.startsWith(`${anoStr}-${mesStr}`)).forEach(t=>{ const d=parseInt(t.data.substring(8,10)); if(!vDia[d])vDia[d]={v:0,p:0}; vDia[d].v+=t.valorLiquido; vDia[d].p+=t.qtdPedidos; });
-            for(let i=0; i<new Date(ano, mes, 1).getDay(); i++) cal.innerHTML += `<div class="cal-day empty"></div>`;
-            for(let d=1; d<=dias; d++) cal.innerHTML += vDia[d] ? `<div class="cal-day has-data"><span class="date-num">${d}</span><div><p class="text-[10px] text-emerald-800 font-bold">${formatMoney(vDia[d].v)}</p></div></div>` : `<div class="cal-day"><span class="date-num">${d}</span></div>`;
-        }
-
-        /* === BACKUP E IMPORTAÇÃO === */
-        window.exportarBackup = function(nomeArquivoPersonalizado) {
-            if(currentUserRole !== 'admin') return;
-            const str = JSON.stringify({ transacoes, sociosBase, pagamentosSocios, metaMensal, contasPagar, fechamentos, auditoria });
-            const a = document.createElement('a'); a.href = 'data:application/json;charset=utf-8,'+ encodeURIComponent(str);
-            a.download = typeof nomeArquivoPersonalizado === 'string' ? nomeArquivoPersonalizado : `v6.1_cloud_backup_${hojeStr}.json`; a.click();
-            logAuditoria('Sistema', 'Backup Exportado', a.download);
-        }
-        
-        window.importarBackup = function() {
-            if(currentUserRole !== 'admin') return;
-            const f = document.getElementById('file-import').files[0]; if(!f) return alert('Selecione um arquivo de backup.'); 
-            const r = new FileReader();
-            r.onload = function(e) {
-                try {
-                    const obj = JSON.parse(e.target.result);
-                    if(obj.transacoes) { 
-                        transacoes=obj.transacoes; sociosBase=obj.sociosBase||sociosBase; pagamentosSocios=obj.pagamentosSocios||[]; metaMensal=obj.metaMensal||15000; contasPagar=obj.contasPagar||[]; fechamentos=obj.fechamentos||[]; auditoria=obj.auditoria||[]; 
-                        salvarDados(true); init(); alert('Sucesso! Arquivo lido e transferido para a Nuvem (Firebase).'); 
-                    }
-                } catch(err) { alert('Erro no formato do arquivo.'); }
-            }; r.readAsText(f);
-        }
-
     </script>
 </body>
 </html>
